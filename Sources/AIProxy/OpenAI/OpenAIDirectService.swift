@@ -345,6 +345,45 @@ open class OpenAIDirectService: OpenAIService, DirectService {
         return try await self.makeRequestAndDeserializeResponse(request)
     }
 
+    /// Initiates a streaming response request to /v1/responses with streaming enabled.
+    ///
+    /// - Parameters:
+    ///   - requestBody: The request body to send to OpenAI. See this reference:
+    ///                  https://platform.openai.com/docs/api-reference/responses/create
+    ///   - secondsToWait: The amount of time to wait before `URLError.timedOut` is raised
+    /// - Returns: An async sequence of response chunks. See this reference:
+    ///            https://platform.openai.com/docs/api-reference/responses/streaming
+    public func streamResponse(
+        requestBody: OpenAICreateResponseRequestBody,
+        secondsToWait: UInt
+    ) async throws -> AsyncCompactMapSequence<AsyncLineSequence<URLSession.AsyncBytes>, OpenAIResponseStreamingChunk> {
+        // Create a new request body with streaming enabled
+        let streamingRequestBody = OpenAICreateResponseRequestBody(
+            input: requestBody.input,
+            model: requestBody.model,
+            tools: requestBody.tools,
+            toolChoice: requestBody.toolChoice,
+            reasoning: requestBody.reasoning,
+            parallelToolCalls: requestBody.parallelToolCalls,
+            previousResponseId: requestBody.previousResponseId,
+            truncation: requestBody.truncation,
+            stream: true
+        )
+        
+        let request = try AIProxyURLRequest.createDirect(
+            baseURL: self.baseURL,
+            path: self.resolvedPath("responses"),
+            body: try streamingRequestBody.serialize(),
+            verb: .post,
+            secondsToWait: secondsToWait,
+            contentType: "application/json",
+            additionalHeaders: [
+                "Authorization": "Bearer \(self.unprotectedAPIKey)"
+            ]
+        )
+        return try await self.makeRequestAndDeserializeStreamingChunks(request)
+    }
+
     private func resolvedPath(_ common: String) -> String {
         assert(common[common.startIndex] != "/")
         switch self.requestFormat {
