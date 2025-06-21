@@ -156,8 +156,7 @@ public protocol OpenAIService {
     ) async throws -> OpenAIResponse
     
     /// Creates a streaming 'response' using OpenAI's new API product:
-    /// https://platform.openai.com/docs/api-reference/responses/streaming
-    /// 
+    ///
     /// - Parameters:
     ///   - requestBody: The request body to send to OpenAI. See this reference:
     ///                  https://platform.openai.com/docs/api-reference/responses/create

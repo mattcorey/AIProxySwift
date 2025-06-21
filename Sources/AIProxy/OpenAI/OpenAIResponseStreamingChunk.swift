@@ -2,7 +2,7 @@
 //  OpenAIResponseStreamingChunk.swift
 //  AIProxy
 //
-//  Created by Assistant on 6/21/25.
+//  Created by Matt Corey on 6/21/25.
 //
 
 import Foundation
@@ -96,26 +96,6 @@ public struct OpenAIResponseStreamingChunk: Decodable {
         }
     }
     
-    /// Audio delta content as base64 (only available in audioDelta event)
-    public var audioDelta: String? {
-        switch event.data {
-        case .audioDelta(let data):
-            return data.delta
-        default:
-            return nil
-        }
-    }
-    
-    /// Audio transcript delta (only available in audioTranscriptDelta event)
-    public var audioTranscriptDelta: String? {
-        switch event.data {
-        case .audioTranscriptDelta(let data):
-            return data.delta
-        default:
-            return nil
-        }
-    }
-    
     /// Reasoning delta (only available in reasoningDelta event)
     public var reasoningDelta: String? {
         switch event.data {
@@ -151,8 +131,6 @@ public struct OpenAIResponseStreamingChunk: Decodable {
         switch event.type {
         case .responseOutputTextDelta,
              .responseFunctionCallArgumentsDelta,
-             .responseAudioDelta,
-             .responseAudioTranscriptDelta,
              .responseReasoningDelta,
              .responseRefusalDelta:
             return true
@@ -228,18 +206,6 @@ extension OpenAIResponseStreamingChunk {
             return data.outputItemIndex
         case .webSearchCallProgress(let data):
             return data.outputItemIndex
-        case .audioDelta(let data):
-            return data.outputItemIndex
-        case .audioDone(let data):
-            return data.outputItemIndex
-        case .audioTranscriptDelta(let data):
-            return data.outputItemIndex
-        case .audioTranscriptDone(let data):
-            return data.outputItemIndex
-        case .codeInterpreterCallProgress(let data):
-            return data.outputItemIndex
-        case .computerCallProgress(let data):
-            return data.outputItemIndex
         case .reasoningDelta(let data):
             return data.outputItemIndex
         case .reasoningDone(let data):
@@ -265,14 +231,6 @@ extension OpenAIResponseStreamingChunk {
         case .refusalDelta(let data):
             return data.contentPartIndex
         case .refusalDone(let data):
-            return data.contentPartIndex
-        case .audioDelta(let data):
-            return data.contentPartIndex
-        case .audioDone(let data):
-            return data.contentPartIndex
-        case .audioTranscriptDelta(let data):
-            return data.contentPartIndex
-        case .audioTranscriptDone(let data):
             return data.contentPartIndex
         default:
             return nil

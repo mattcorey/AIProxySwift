@@ -2,7 +2,7 @@
 //  OpenAIResponseStreamEventType.swift
 //  AIProxy
 //
-//  Created by Assistant on 6/21/25.
+//  Created by Matt Corey on 6/21/25.
 //
 
 /// Represents all possible event types in the OpenAI Streaming Responses API
@@ -25,7 +25,7 @@ public enum OpenAIResponseStreamEventType: String {
     
     // MARK: - Output Text Events
     case responseOutputTextDelta = "response.output_text.delta"
-    case responseOutputTextAnnotationAdded = "response.output_text.annotation.added"
+    case responseOutputTextAnnotationAdded = "response.output_text_annotation.added"
     case responseOutputTextDone = "response.output_text.done"
     
     // MARK: - Refusal Events
@@ -45,24 +45,6 @@ public enum OpenAIResponseStreamEventType: String {
     case responseWebSearchCallInProgress = "response.web_search_call.in_progress"
     case responseWebSearchCallSearching = "response.web_search_call.searching"
     case responseWebSearchCallCompleted = "response.web_search_call.completed"
-    
-    // MARK: - Audio Events
-    case responseAudioDelta = "response.audio.delta"
-    case responseAudioDone = "response.audio.done"
-    
-    // MARK: - Audio Transcript Events
-    case responseAudioTranscriptDelta = "response.audio_transcript.delta"
-    case responseAudioTranscriptDone = "response.audio_transcript.done"
-    
-    // MARK: - Code Interpreter Events
-    case responseCodeInterpreterCallInProgress = "response.code_interpreter_call.in_progress"
-    case responseCodeInterpreterCallExecuting = "response.code_interpreter_call.executing"
-    case responseCodeInterpreterCallCompleted = "response.code_interpreter_call.completed"
-    
-    // MARK: - Computer Call Events
-    case responseComputerCallInProgress = "response.computer_call.in_progress"
-    case responseComputerCallExecuting = "response.computer_call.executing"
-    case responseComputerCallCompleted = "response.computer_call.completed"
     
     // MARK: - Reasoning Events
     case responseReasoningDelta = "response.reasoning.delta"

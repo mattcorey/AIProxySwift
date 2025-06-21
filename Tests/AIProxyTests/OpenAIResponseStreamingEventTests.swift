@@ -2,7 +2,7 @@
 //  OpenAIResponseStreamingEventTests.swift
 //  AIProxyTests
 //
-//  Created by Assistant on 6/21/25.
+//  Created by Matt Corey on 6/21/25.
 //
 
 import XCTest
