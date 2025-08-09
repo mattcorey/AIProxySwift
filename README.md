@@ -1359,6 +1359,11 @@ final class RealtimeManager {
 ### How to make a basic request using OpenAI's Responses API
 Note: there is also a streaming version of this snippet below.
 
+The new `reasoning.effort`, `reasoning.summary`, and `text.verbosity` parameters allow you to control response generation:
+- `reasoning.effort`: `minimal`, `low`, `medium` (default), `high` - Controls reasoning depth for o-series models
+- `reasoning.summary`: `auto`, `concise`, `detailed` - Controls reasoning summary detail (replaces deprecated `generateSummary`)
+- `text.verbosity`: `low`, `medium` (default), `high` - Controls response detail level
+
 ```swift
     import AIProxy
 
@@ -1375,8 +1380,10 @@ Note: there is also a streaming version of this snippet below.
 
     let requestBody = OpenAICreateResponseRequestBody(
         input: .text("hello world"),
-        previousResponseId: nil,  // Pass this in on future requests to save chat history
-        model: "gpt-4o"
+        model: "gpt-4o",
+        reasoning: .init(effort: .minimal, summary: .auto),  // Optional: Use minimal effort with auto summary
+        text: .init(verbosity: .low),                        // Optional: Use low verbosity for concise responses
+        previousResponseId: nil                              // Pass this in on future requests to save chat history
     )
 
     do {
