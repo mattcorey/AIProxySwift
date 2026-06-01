@@ -15,25 +15,25 @@ import UIKit
 import IOKit
 #endif
 
-enum AIProxyIdentifier {
+@AIProxyActor enum AIProxyIdentifier {
     /// Generates a clientID for this device.
     /// - Returns: The AIProxy stableID if the developer configured the SDK with `useStableID`.
     ///            Otherwise, a UIDevice ID on iOS, an IOKit ID on macOS
-    internal static func getClientID() -> String {
-        if let stableID = AIProxyConfiguration.stableID {
+    internal static func getClientID() async -> String {
+        if let stableID = AIProxy.stableID {
             return stableID
         }
 #if os(watchOS)
         let clientID = WKInterfaceDevice.current().identifierForVendor?.uuidString
 #elseif canImport(UIKit)
-        let clientID = UIDevice.current.identifierForVendor?.uuidString
+        let clientID = await UIDevice.current.identifierForVendor?.uuidString
 #elseif canImport(IOKit)
         let clientID = getIdentifierFromIOKit()
 #endif
         if let clientID = clientID {
             return clientID
         }
-        ClientLibErrorLogger.logClientIdentifierIsNil()
+        await ClientLibErrorLogger.logClientIdentifierIsNil()
         return "unknown"
     }
 

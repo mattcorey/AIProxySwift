@@ -7,9 +7,10 @@
 
 import Foundation
 
-protocol DirectService: ServiceMixin {}
+@AIProxyActor protocol DirectService: ServiceMixin {}
+
 extension DirectService {
     var urlSession: URLSession {
-        return AIProxyUtils.directURLSession()
+        return AIProxyUtils.directURLSession
     }
 }

@@ -130,6 +130,7 @@ final class OpenAIResponseObjectTests: XCTestCase {
         XCTAssertEqual(1.0, res.topP)
         XCTAssertEqual("disabled", res.truncation)
         XCTAssertEqual(26, res.usage?.inputTokens)
+        XCTAssertEqual(0, res.usage?.inputTokensDetails?.cachedTokens)
         XCTAssertEqual(10, res.usage?.outputTokens)
         XCTAssertEqual(0, res.usage?.outputTokensDetails?.reasoningTokens)
         XCTAssertEqual(36, res.usage?.totalTokens)
@@ -446,4 +447,139 @@ final class OpenAIResponseObjectTests: XCTestCase {
 
         XCTAssertEqual("You always starts responses with Ahoy Matey", str)
     }
+
+    func testGPT5_1ResponseWithReasoningNoneIsDecodable() throws {
+        let sampleResponse = #"""
+        {
+          "effort": "none",
+          "summary": null
+        }
+        """#
+        let res = try OpenAIResponse.Reasoning.deserialize(from: sampleResponse)
+        XCTAssertEqual(.noReasoning, res.effort)
+    }
+
+    func testGPT5_1ResponseWithUnknownReasoningIsDecodable() throws {
+        let sampleResponse = #"""
+        {
+          "effort": "foobar",
+          "summary": null
+        }
+        """#
+        let res = try OpenAIResponse.Reasoning.deserialize(from: sampleResponse)
+        XCTAssertEqual(.futureProof, res.effort)
+    }
+
+    func testResponseWithCompactionOutputItemIsDecodable() throws {
+        let sampleResponse = #"""
+        {
+          "id": "resp_compaction",
+          "object": "response",
+          "created_at": 1753111046,
+          "status": "completed",
+          "error": null,
+          "incomplete_details": null,
+          "instructions": null,
+          "max_output_tokens": null,
+          "model": "gpt-5.3-codex",
+          "output": [
+            {
+              "id": "cmp_123",
+              "type": "compaction",
+              "encrypted_content": "enc_abc123",
+              "created_by": "system"
+            },
+            {
+              "id": "msg_123",
+              "type": "message",
+              "status": "completed",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "Done",
+                  "annotations": []
+                }
+              ],
+              "role": "assistant"
+            }
+          ],
+          "parallel_tool_calls": true,
+          "previous_response_id": null,
+          "reasoning": {
+            "effort": null,
+            "summary": null
+          },
+          "store": false,
+          "temperature": 1.0,
+          "text": {
+            "format": {
+              "type": "text"
+            }
+          },
+          "tool_choice": "auto",
+          "tools": [],
+          "top_p": 1.0,
+          "truncation": "disabled",
+          "usage": null,
+          "user": null,
+          "metadata": {}
+        }
+        """#
+
+        let res = try OpenAIResponse.deserialize(from: sampleResponse)
+        XCTAssertEqual(2, res.output.count)
+
+        guard case .compaction(let compaction) = res.output.first else {
+            return XCTFail("Expected first output item to be a compaction item")
+        }
+
+        XCTAssertEqual("cmp_123", compaction.id)
+        XCTAssertEqual("enc_abc123", compaction.encryptedContent)
+        XCTAssertEqual("system", compaction.createdBy)
+        XCTAssertEqual("Done", res.outputText)
+    }
+
+    func testResponseWithCompactionOutputItemWithoutIdIsDecodable() throws {
+        let sampleResponse = #"""
+        {
+          "id": "resp_compaction2",
+          "object": "response",
+          "created_at": 1753111046,
+          "status": "completed",
+          "error": null,
+          "incomplete_details": null,
+          "instructions": null,
+          "max_output_tokens": null,
+          "model": "gpt-5.3-codex",
+          "output": [
+            {
+              "type": "compaction",
+              "encrypted_content": "enc_only"
+            }
+          ],
+          "parallel_tool_calls": true,
+          "previous_response_id": null,
+          "reasoning": { "effort": null, "summary": null },
+          "store": false,
+          "temperature": 1.0,
+          "text": { "format": { "type": "text" } },
+          "tool_choice": "auto",
+          "tools": [],
+          "top_p": 1.0,
+          "truncation": "disabled",
+          "usage": null,
+          "user": null,
+          "metadata": {}
+        }
+        """#
+
+        let res = try OpenAIResponse.deserialize(from: sampleResponse)
+        guard case .compaction(let compaction) = res.output.first else {
+            return XCTFail("Expected compaction output item")
+        }
+        XCTAssertNil(compaction.id)
+        XCTAssertNil(compaction.createdBy)
+        XCTAssertEqual("enc_only", compaction.encryptedContent)
+    }
+
 }

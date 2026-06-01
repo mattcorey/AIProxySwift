@@ -12,15 +12,28 @@ import Foundation
 /// Create stateful interactions with the model, using the output of previous responses as input.
 /// Extend the model's capabilities with built-in tools for file search, web search, computer use, and more.
 /// Allow the model access to external systems and data using function calling.
-/// https://platform.openai.com/docs/api-reference/responses/create
+/// https://developers.openai.com/api/reference/resources/responses/methods/create
 /// Implementor's note: See ResponseCreateParamsBase in `src/openai/types/responses/response_create_params.py`
-public struct OpenAICreateResponseRequestBody: Encodable {
+nonisolated public struct OpenAICreateResponseRequestBody: Encodable, Sendable {
+
+    /// Specify additional output data to include in the model response.
+    public let include: [OpenAIInclude]?
 
     /// Text, image, or file inputs to the model, used to generate a response.
     public let input: OpenAIResponse.Input?
 
-    /// Specify additional output data to include in the model response.
-    public let include: [Include]?
+    /// Inserts a system (or developer) message as the first item in the model's context.
+    /// When using along with `previousResponseId`, the instructions from a previous response
+    /// will not be carried over to the next response. This makes it simple to swap out system
+    /// (or developer) messages in new responses.
+    public let instructions: String?
+
+    /// An upper bound for the number of tokens that can be generated for a response,
+    /// including visible output tokens and reasoning tokens: https://developers.openai.com/docs/guides/reasoning
+    public let maxOutputTokens: Int?
+
+    /// Elements of the JSON `context_management` array on the create-response request.
+    public let contextManagement: [ContextManagementItem]?
 
     /// Model ID used to generate the response, like gpt-4o or o1.
     /// OpenAI offers a wide range of models with different capabilities, performance characteristics, and price points.
@@ -47,6 +60,10 @@ public struct OpenAICreateResponseRequestBody: Encodable {
     /// The IDs should be a string that uniquely identifies each user.
     /// We recommend hashing their username or email address, in order to avoid sending us any identifying information.
     public let safetyIdentifier: String?
+
+    /// Whether to store the generated model response for later retrieval via API.
+    /// Defaults to true.
+    public let store: Bool?
 
     /// If set, partial response deltas will be sent as server-sent events.
     /// Set this to true when using the streaming response method.
@@ -83,13 +100,17 @@ public struct OpenAICreateResponseRequestBody: Encodable {
     public let user: String?
 
     private enum CodingKeys: String, CodingKey {
-        case input
         case include
+        case input
+        case instructions
+        case maxOutputTokens = "max_output_tokens"
+        case contextManagement = "context_management"
         case model
         case tools
         case toolChoice = "tool_choice"
         case reasoning
         case safetyIdentifier = "safety_identifier"
+        case store
         case parallelToolCalls = "parallel_tool_calls"
         case previousResponseId = "previous_response_id"
         case prompt
@@ -105,14 +126,18 @@ public struct OpenAICreateResponseRequestBody: Encodable {
     // To regenerate, use `cmd-shift-a` > Generate Memberwise Initializer
     // To format, place the cursor in the initializer's parameter list and use `ctrl-m`
     public init(
+        include: [OpenAIInclude]? = nil,
         input: OpenAIResponse.Input? = nil,
-        include: [Include]? = nil,
+        instructions: String? = nil,
+        maxOutputTokens: Int? = nil,
+        contextManagement: [OpenAICreateResponseRequestBody.ContextManagementItem]? = nil,
         model: String? = nil,
         parallelToolCalls: Bool? = nil,
         previousResponseId: String? = nil,
         prompt: OpenAICreateResponseRequestBody.Prompt? = nil,
         reasoning: OpenAICreateResponseRequestBody.Reasoning? = nil,
         safetyIdentifier: String? = nil,
+        store: Bool? = nil,
         stream: Bool? = nil,
         temperature: Double? = nil,
         text: OpenAIResponse.TextConfiguration? = nil,
@@ -122,14 +147,18 @@ public struct OpenAICreateResponseRequestBody: Encodable {
         truncation: OpenAICreateResponseRequestBody.Truncation? = nil,
         user: String? = nil
     ) {
-        self.input = input
         self.include = include
+        self.input = input
+        self.instructions = instructions
+        self.maxOutputTokens = maxOutputTokens
+        self.contextManagement = contextManagement
         self.model = model
         self.parallelToolCalls = parallelToolCalls
         self.previousResponseId = previousResponseId
         self.prompt = prompt
         self.reasoning = reasoning
         self.safetyIdentifier = safetyIdentifier
+        self.store = store
         self.stream = stream
         self.temperature = temperature
         self.text = text
@@ -146,40 +175,49 @@ public struct OpenAICreateResponseRequestBody: Encodable {
 
 extension OpenAICreateResponseRequestBody {
 
-    /// Specify additional output data to include in the model response.
-    public enum Include: String, Codable {
-        /// Include the outputs of python code execution in code interpreter tool call items.
-        case codeInterpreterCallOutputs = "code_interpreter_call.outputs"
-        
-        /// Include image urls from the computer call output.
-        case computerCallOutputImageUrl = "computer_call_output.output.image_url"
-        
-        /// Include the search results of the file search tool call.
-        case fileSearchCallResults = "file_search_call.results"
-        
-        /// Include image urls from the input message.
-        case messageInputImageImageUrl = "message.input_image.image_url"
-        
-        /// Include logprobs with assistant messages.
-        case messageOutputTextLogprobs = "message.output_text.logprobs"
-        
-        /// Includes an encrypted version of reasoning tokens in reasoning item outputs.
-        case reasoningEncryptedContent = "reasoning.encrypted_content"
-        
-        /// Include the sources of the web search tool call.
-        case webSearchCallActionSources = "web_search_call.action.sources"
+    /// One object in the JSON `context_management` array (`type`, `compact_threshold`, …).
+    nonisolated public struct ContextManagementItem: Encodable, Sendable {
+        /// The context management entry type. Currently only `compaction` is supported.
+        public let type: EntryType
+
+        /// Token threshold at which compaction should be triggered for this entry.
+        public let compactThreshold: Int?
+
+        private enum CodingKeys: String, CodingKey {
+            case type
+            case compactThreshold = "compact_threshold"
+        }
+
+        public init(
+            type: EntryType = .compaction,
+            compactThreshold: Int? = nil
+        ) {
+            self.type = type
+            self.compactThreshold = compactThreshold
+        }
+
+        nonisolated public enum EntryType: String, Encodable, Sendable {
+            case compaction
+        }
     }
 
+    /// Legacy name for one element of the JSON `context_management` array.
+    @available(*, deprecated, renamed: "ContextManagementItem")
+    public typealias ContextManagement = ContextManagementItem
+
+    /// Legacy nested name retained for callers that used sdkVersion <= 0.121.0.
+    public typealias Include = OpenAIInclude
+
     /// The truncation strategy to use for the model response.
-    public enum Truncation: String, Encodable {
-        /// If the context of this response and previous ones exceeds the model's context window size, the model will truncate the response to fit the context window by dropping input items in the middle of the conversation.
+    nonisolated public enum Truncation: String, Encodable, Sendable {
+        /// If the input to this response exceeds the model's context window size, the model will truncate the response to fit the context window by dropping items from the beginning of the conversation.
         case auto
 
-        /// If a model response will exceed the context window size for a model, the request will fail with a 400 error.
+        /// If the input size will exceed the context window size for a model, the request will fail with a 400 error.
         case disabled
     }
 
-    public struct Prompt: Encodable {
+    nonisolated public struct Prompt: Encodable, Sendable {
         /// The unique identifier of the prompt template to use.
         public let id: String
 
@@ -200,7 +238,7 @@ extension OpenAICreateResponseRequestBody {
         }
     }
 
-    public enum Variable: Encodable {
+    nonisolated public enum Variable: Encodable, Sendable {
         case text(String)
 
         public func encode(to encoder: any Encoder) throws {
@@ -217,7 +255,7 @@ extension OpenAICreateResponseRequestBody {
 extension OpenAICreateResponseRequestBody {
     /// A tool specification that models can use in responses.
     /// See https://platform.openai.com/docs/guides/tools
-    public enum Tool: Codable {
+    nonisolated public enum Tool: Codable, Sendable {
 
         /// Build a computer-using agent that can perform tasks on your behalf.
         /// https://platform.openai.com/docs/guides/tools-computer-use
@@ -237,7 +275,8 @@ extension OpenAICreateResponseRequestBody {
 
         /// Allow models to search the web for the latest information before generating a response (preview version).
         /// https://platform.openai.com/docs/guides/tools-web-search?api-mode=responses
-        @available(*, deprecated, message: "Use webSearch if using a modern GTP model. webSearchPreview will be removed in a future version.")
+        /// Not including the deprecated message as it causes a compiler warning in our own decoder conformance on OpenAIResponseTool.
+        // @available(*, deprecated, message: "Use webSearch if using a modern GPT model. webSearchPreview will be removed in a future version.")
         case webSearchPreview(WebSearchPreviewTool)
 
         private enum CodingKeys: String, CodingKey {
@@ -339,7 +378,7 @@ extension OpenAICreateResponseRequestBody {
     }
 
     // MARK: - File Search Tool
-    public struct FileSearchTool: Codable {
+    nonisolated public struct FileSearchTool: Codable, Sendable {
 
         // Required
         /// The type of the file search tool. Always `file_search`.
@@ -379,7 +418,7 @@ extension OpenAICreateResponseRequestBody {
             self.rankingOptions = rankingOptions
         }
 
-        public struct RankingOptions: Codable {
+        nonisolated public struct RankingOptions: Codable, Sendable {
             /// The ranker to use for the file search.
             public let ranker: String?
 
@@ -399,7 +438,7 @@ extension OpenAICreateResponseRequestBody {
         }
     }
 
-    public enum FileSearchFilter: Codable {
+    nonisolated public enum FileSearchFilter: Codable, Sendable {
         case comparison(ComparisonFilter)
         case compound(CompoundFilter)
 
@@ -412,7 +451,7 @@ extension OpenAICreateResponseRequestBody {
         }
 
         /// A filter used to compare a specified attribute key to a given value using a defined comparison operation.
-        public struct ComparisonFilter: Codable {
+        nonisolated public struct ComparisonFilter: Codable, Sendable {
             /// The key to compare against the value.
             public let key: String
 
@@ -429,7 +468,7 @@ extension OpenAICreateResponseRequestBody {
             }
         }
 
-        public enum ComparisonOperator: String, Codable {
+        nonisolated public enum ComparisonOperator: String, Codable, Sendable {
             case eq
             case ne
             case gt
@@ -439,7 +478,7 @@ extension OpenAICreateResponseRequestBody {
         }
 
         /// Combine multiple filters using `and` or `or`.
-        public struct CompoundFilter: Codable {
+        nonisolated public struct CompoundFilter: Codable, Sendable {
             /// Array of filters to combine. Items can be `ComparisonFilter` or `CompoundFilter`.
             public let filters: [FileSearchFilter]
 
@@ -452,14 +491,14 @@ extension OpenAICreateResponseRequestBody {
             }
         }
 
-        public enum CompoundOperator: String, Codable {
+        nonisolated public enum CompoundOperator: String, Codable, Sendable {
             case and
             case or
         }
     }
 
     // MARK: - Web Search Tool
-    public struct WebSearchTool: Codable {
+    nonisolated public struct WebSearchTool: Codable, Sendable {
         private enum CodingKeys: String, CodingKey {
             case type
             case searchContextSize = "search_context_size"
@@ -478,13 +517,13 @@ extension OpenAICreateResponseRequestBody {
             self.userLocation = userLocation
         }
 
-        public enum SearchContextSize: String, Codable {
+        nonisolated public enum SearchContextSize: String, Codable, Sendable {
             case high
             case medium
             case low
         }
 
-        public struct UserLocation: Codable {
+        nonisolated public struct UserLocation: Codable, Sendable {
             public var type = "approximate"
             public let city: String?
             public let country: String?
@@ -506,11 +545,12 @@ extension OpenAICreateResponseRequestBody {
     }
 
     // MARK: - Web Search Tool (Preview)
-    @available(*, deprecated, message: "Use WebSearchTool instead. WebSearchPreviewTool will be removed in a future version.")
+    // Not including the deprecated message as it causes a compiler warning in our own decoder conformance on OpenAIResponseTool.
+    // @available(*, deprecated, message: "Use WebSearchTool instead. WebSearchPreviewTool will be removed in a future version.")
     public typealias WebSearchPreviewTool = WebSearchTool
 
     // MARK: - Computer Use Tool
-    public struct ComputerUseTool: Codable {
+    nonisolated public struct ComputerUseTool: Codable, Sendable {
         private enum CodingKeys: String, CodingKey {
             case type
             case displayWidth = "display_width"
@@ -533,7 +573,7 @@ extension OpenAICreateResponseRequestBody {
             self.environment = environment
         }
 
-        public enum Environment: String, Codable {
+        nonisolated public enum Environment: String, Codable, Sendable {
             case browser
             case mac
             case windows
@@ -542,7 +582,7 @@ extension OpenAICreateResponseRequestBody {
     }
 
     // MARK: - Function Tool
-    public struct FunctionTool: Codable {
+    nonisolated public struct FunctionTool: Codable, Sendable {
         // Required
 
         /// The name of the function to call.
@@ -587,7 +627,7 @@ extension OpenAICreateResponseRequestBody {
 // MARK: - Reasoning
 extension OpenAICreateResponseRequestBody {
     /// Configuration options for reasoning models
-    public struct Reasoning: Encodable {
+    nonisolated public struct Reasoning: Encodable, Sendable {
         private enum CodingKeys: String, CodingKey {
             case effort
             case generateSummary = "generate_summary"
@@ -627,7 +667,7 @@ extension OpenAICreateResponseRequestBody {
             } else {
                 self.summary = nil
             }
-            
+
             self.generateSummary = nil
         }
     }
@@ -635,16 +675,25 @@ extension OpenAICreateResponseRequestBody {
 
 // MARK: - Reasoning Types
 extension OpenAICreateResponseRequestBody.Reasoning {
-    /// Supported effort levels for reasoning models
-    public enum Effort: String, Encodable {
+    /// Constrains effort on reasoning for reasoning models. Currently supported values are `none`, `minimal`, `low`, `medium`, and `high`.
+    /// Reducing reasoning effort can result in faster responses and fewer tokens used on reasoning in a response.
+    ///
+    /// gpt-5.1 defaults to `none`, which does not perform reasoning.
+    /// The supported reasoning values for gpt-5.1 are `none`, `low`, `medium`, and `high`.
+    /// Tool calls are supported for all reasoning values in gpt-5.1.
+    /// All models before gpt-5.1 default to `medium` reasoning effort, and do not support `none`.
+    /// The gpt-5-pro model defaults to (and only supports) `high` reasoning effort.
+    nonisolated public enum Effort: String, Encodable, Sendable {
+        case noReasoning = "none"
         case minimal
         case low
         case medium
         case high
+        case xhigh
     }
 
     /// Summary types for reasoning models
-    public enum SummaryType: String, Encodable {
+    nonisolated public enum SummaryType: String, Encodable, Sendable {
         case auto
         case concise
         case detailed
@@ -653,7 +702,7 @@ extension OpenAICreateResponseRequestBody.Reasoning {
 
 // MARK: - Tool Choice
 extension OpenAICreateResponseRequestBody {
-    public enum ToolChoice: Codable {
+    nonisolated public enum ToolChoice: Codable, Sendable {
         case none
         case auto
         case required

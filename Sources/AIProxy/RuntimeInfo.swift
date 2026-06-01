@@ -11,7 +11,7 @@ import Foundation
 import UIKit
 #endif
 
-struct RuntimeInfo {
+nonisolated struct RuntimeInfo {
     let appName: String
     let appVersion: String
     let buildNumber: String
@@ -20,7 +20,7 @@ struct RuntimeInfo {
     let osVersion: String
     let systemName: String
 
-    static var current: RuntimeInfo = {
+    static func getCurrent() async -> RuntimeInfo {
         let bundle = Bundle.main
         let infoDict = bundle.infoDictionary ?? [:]
 
@@ -31,19 +31,20 @@ struct RuntimeInfo {
             bundleID: bundle.bundleIdentifier ?? "Unknown",
             deviceModel: getDeviceModel(),
             osVersion: getOSVersion(),
-            systemName: getSystemName()
+            systemName: await getSystemName()
         )
-    }()
+    }
 }
 
-private func getDeviceModel() -> String {
+nonisolated private func getDeviceModel() -> String {
     #if os(macOS)
     let sysCallName = "hw.model"
     #else
     let sysCallName = "hw.machine"
     #endif
     var size: size_t = 0
-    guard sysctlbyname(sysCallName, nil, &size, nil, 0) == noErr, size > 0 else {
+    guard sysctlbyname(sysCallName, nil, &size, nil, 0) == noErr,
+          size > 1 else {
         return "Unknown"
     }
 
@@ -52,20 +53,26 @@ private func getDeviceModel() -> String {
         return "Unknown"
     }
 
-    return String(cString: machine)
+    let decoding = machine
+        .prefix(size - 1)
+        .map { UInt8($0) }
+
+    let deviceModel = String(decoding: decoding, as: UTF8.self)
+    logIf(.debug)?.debug("Inferred device model to be: \(deviceModel)")
+    return deviceModel
 }
 
-private func getSystemName() -> String {
+nonisolated private func getSystemName() async -> String {
     #if os(macOS)
     return "macOS"
     #elseif os(watchOS)
     return "watchOS"
     #else
-    return UIDevice.current.systemName
+    return await UIDevice.current.systemName
     #endif
 }
 
-private func getOSVersion() -> String {
+nonisolated private func getOSVersion() -> String {
     let osVersion = ProcessInfo.processInfo.operatingSystemVersion
     return "\(osVersion.majorVersion).\(osVersion.minorVersion).\(osVersion.patchVersion)"
 }

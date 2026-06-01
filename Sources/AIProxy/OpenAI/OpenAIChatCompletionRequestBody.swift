@@ -9,7 +9,7 @@ import Foundation
 
 /// Chat completion request body. Docstrings are taken from this reference:
 /// https://platform.openai.com/docs/api-reference/chat/create
-public struct OpenAIChatCompletionRequestBody: Encodable {
+nonisolated public struct OpenAIChatCompletionRequestBody: Encodable, Sendable {
 
     /// ID of the model to use. See the model endpoint compatibility table for details on which models work
     /// with the Chat API:
@@ -62,6 +62,31 @@ public struct OpenAIChatCompletionRequestBody: Encodable {
     /// Defaults to 0
     public let presencePenalty: Double?
 
+    /// Used by OpenAI to cache responses for similar requests to optimize your cache hit rates. Replaces the user field.
+    /// https://platform.openai.com/docs/guides/prompt-caching
+    public let promptCacheKey: String?
+
+    /// The retention policy for the prompt cache. Set to 24h to enable extended prompt caching, which keeps cached prefixes active for longer, up to a maximum of 24 hours.
+    /// https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention
+    public let promptCacheRetention: PromptCacheRetention?
+
+    /// Constrains effort on reasoning for reasoning models.
+    ///
+    /// Currently supported values are `noReasoning`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
+    /// Reducing reasoning effort can result in faster responses and fewer tokens used on reasoning in a response.
+    ///
+    /// - gpt-5.1 defaults to `noReasoning`, which does not perform reasoning.
+    /// - The supported reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`.
+    /// - Tool calls are supported for all reasoning values in `gpt-5.1`.
+    /// - All models before `gpt-5.1` default to `medium` reasoning effort, and do not support `noReasoning`.
+    /// - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
+    /// - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+    ///
+    /// We've mapped `noReasoning` to OpenAI's `none`  in order to avoid collision with Swift's Optional `none` case.
+    ///
+    /// Defaults to `medium`
+    public let reasoningEffort: ReasoningEffort?
+
     /// Specifies the format that the model must output. Please see the docstring on `ResponseFormat` for important usage information
     public let responseFormat: ResponseFormat?
 
@@ -74,7 +99,7 @@ public struct OpenAIChatCompletionRequestBody: Encodable {
     /// Whether or not to store the output of this chat completion request for use in our model distillation or evals products.
     /// Model distillation: https://platform.openai.com/docs/guides/distillation
     /// Evals: https://platform.openai.com/docs/guides/evals
-    /// Deafults to false
+    /// Defaults to false
     public let store: Bool?
 
     /// If set, partial message deltas will be sent. Using the `OpenAIService.streamingChatCompletionRequest`
@@ -117,6 +142,11 @@ public struct OpenAIChatCompletionRequestBody: Encodable {
     /// Learn more: https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids
     public let user: String?
 
+    /// Constrains the verbosity of the model's response.
+    /// Lower values will result in more concise responses, while higher values will result in more verbose responses.
+    /// Currently supported values are `low`, `medium`, and `high`.
+    public let verbosity: Verbosity?
+
     /// This tool searches the web for relevant results to use in a response.
     /// Learn more: https://platform.openai.com/docs/guides/tools-web-search?api-mode=chat
     public let webSearchOptions: OpenAIChatCompletionRequestBody.WebSearchOptions?
@@ -135,6 +165,9 @@ public struct OpenAIChatCompletionRequestBody: Encodable {
         case n
         case parallelToolCalls = "parallel_tool_calls"
         case presencePenalty = "presence_penalty"
+        case promptCacheKey = "prompt_cache_key"
+        case promptCacheRetention = "prompt_cache_retention"
+        case reasoningEffort = "reasoning_effort"
         case responseFormat = "response_format"
         case seed
         case stop
@@ -147,6 +180,7 @@ public struct OpenAIChatCompletionRequestBody: Encodable {
         case topLogprobs = "top_logprobs"
         case topP = "top_p"
         case user
+        case verbosity
         case webSearchOptions = "web_search_options"
     }
 
@@ -165,6 +199,9 @@ public struct OpenAIChatCompletionRequestBody: Encodable {
         n: Int? = nil,
         parallelToolCalls: Bool? = nil,
         presencePenalty: Double? = nil,
+        promptCacheKey: String? = nil,
+        promptCacheRetention: OpenAIChatCompletionRequestBody.PromptCacheRetention? = nil,
+        reasoningEffort: OpenAIChatCompletionRequestBody.ReasoningEffort? = nil,
         responseFormat: OpenAIChatCompletionRequestBody.ResponseFormat? = nil,
         seed: Int? = nil,
         stop: [String]? = nil,
@@ -177,6 +214,7 @@ public struct OpenAIChatCompletionRequestBody: Encodable {
         topLogprobs: Int? = nil,
         topP: Double? = nil,
         user: String? = nil,
+        verbosity: Verbosity? = nil,
         webSearchOptions: OpenAIChatCompletionRequestBody.WebSearchOptions? = nil
     ) {
         self.model = model
@@ -190,6 +228,9 @@ public struct OpenAIChatCompletionRequestBody: Encodable {
         self.n = n
         self.parallelToolCalls = parallelToolCalls
         self.presencePenalty = presencePenalty
+        self.promptCacheKey = promptCacheKey
+        self.promptCacheRetention = promptCacheRetention
+        self.reasoningEffort = reasoningEffort
         self.responseFormat = responseFormat
         self.seed = seed
         self.stop = stop
@@ -202,14 +243,16 @@ public struct OpenAIChatCompletionRequestBody: Encodable {
         self.topLogprobs = topLogprobs
         self.topP = topP
         self.user = user
+        self.verbosity = verbosity
         self.webSearchOptions = webSearchOptions
     }
+
 }
 
 // MARK: -
 extension OpenAIChatCompletionRequestBody {
     /// https://platform.openai.com/docs/api-reference/chat/create#chat-create-messages
-    public enum Message: Encodable {
+    nonisolated public enum Message: Encodable, Sendable {
         /// Messages sent by the model in response to user messages
         ///
         /// - Parameters:
@@ -314,14 +357,14 @@ extension OpenAIChatCompletionRequestBody {
 
 // MARK: -
 extension OpenAIChatCompletionRequestBody.Message {
-    public enum MessageContent<
-        SingleType: Encodable,
-        PartsType: Encodable
-    >: Encodable, SingleOrPartsEncodable {
+    nonisolated public enum MessageContent<
+        SingleType: Encodable & Sendable,
+        PartsType: Encodable & Sendable
+    >: Encodable, Sendable, SingleOrPartsEncodable {
         case text(SingleType)
         case parts(PartsType)
 
-        var encodableItem: Encodable {
+        var encodableItem: Encodable & Sendable {
             switch self {
             case .text(let single): return single
             case .parts(let parts): return parts
@@ -332,7 +375,7 @@ extension OpenAIChatCompletionRequestBody.Message {
 
 // MARK: -
 extension OpenAIChatCompletionRequestBody.Message {
-    public enum ContentPart: Encodable {
+    nonisolated public enum ContentPart: Encodable, Sendable {
         /// The text content.
         case text(String)
 
@@ -382,7 +425,7 @@ extension OpenAIChatCompletionRequestBody.Message {
 
 // MARK: -
 extension OpenAIChatCompletionRequestBody.Message.ContentPart {
-    public enum ImageDetail: String, Encodable {
+    nonisolated public enum ImageDetail: String, Encodable, Sendable {
         case auto
         case low
         case high
@@ -391,7 +434,7 @@ extension OpenAIChatCompletionRequestBody.Message.ContentPart {
 
 // MARK: -
 extension OpenAIChatCompletionRequestBody.Message {
-    public struct ToolCall: Encodable {
+    nonisolated public struct ToolCall: Encodable, Sendable {
         /// The ID of the tool call.
         let id: String
 
@@ -415,7 +458,7 @@ extension OpenAIChatCompletionRequestBody.Message {
 extension OpenAIChatCompletionRequestBody.Message.ToolCall {
     /// Represents the 'Function' object at `messages > assistant message > tool_calls > function`
     /// https://platform.openai.com/docs/api-reference/chat/create#chat-create-messages
-    public struct Function: Encodable {
+    nonisolated public struct Function: Encodable, Sendable {
         /// The name of the function that the assistant asked you to call.
         public let name: String
 
@@ -435,9 +478,27 @@ extension OpenAIChatCompletionRequestBody.Message.ToolCall {
 
 // MARK: -
 extension OpenAIChatCompletionRequestBody {
+    /// References:
+    /// https://platform.openai.com/docs/api-reference/chat/create#chat_create-prompt_cache_retention
+    /// https://platform.openai.com/docs/guides/prompt-caching#prompt-cache-retention
+    nonisolated public enum PromptCacheRetention: String, Encodable, Sendable {
+        case inMemory = "in_memory"
+        case twentyFourHours = "24h"
+    }
+
+    /// https://platform.openai.com/docs/api-reference/chat/create#chat_create-reasoning_effort
+    nonisolated public enum ReasoningEffort: String, Encodable, Sendable {
+        case noReasoning = "none"
+        case minimal
+        case low
+        case medium
+        case high
+        case xhigh
+    }
+
     /// An object specifying the format that the model must output. Compatible with GPT-4o, GPT-4o mini, GPT-4
     /// Turbo and all GPT-3.5 Turbo models newer than gpt-3.5-turbo-1106.
-    public enum ResponseFormat: Encodable {
+    nonisolated public enum ResponseFormat: Encodable, Sendable {
 
         /// Enables JSON mode, which ensures the message the model generates is valid JSON. Note, if you want to
         /// supply your own schema use `jsonSchema` instead.
@@ -463,11 +524,18 @@ extension OpenAIChatCompletionRequestBody {
         ///
         ///   - strict: Whether to enable strict schema adherence when generating the output. If set to true, the
         ///             model will always follow the exact schema defined in the schema field. Only a subset of JSON Schema
-        ///             is supported when strict is true. To learn more, read the Structured Outputs guide.
+        ///             is supported when strict is true. To learn more, read the Structured Outputs guide linked above.
         case jsonSchema(
             name: String,
             description: String? = nil,
             schema: [String: AIProxyJSONValue]? = nil,
+            strict: Bool? = nil
+        )
+
+        case generableJSONSchema(
+            name: String,
+            description: String? = nil,
+            schema: Encodable & Sendable,
             strict: Bool? = nil
         )
 
@@ -506,6 +574,21 @@ extension OpenAIChatCompletionRequestBody {
                 try nestedContainer.encodeIfPresent(description, forKey: .description)
                 try nestedContainer.encodeIfPresent(schema, forKey: .schema)
                 try nestedContainer.encodeIfPresent(strict, forKey: .strict)
+            case .generableJSONSchema(
+                name: let name,
+                description: let description,
+                schema: let schema,
+                strict: let strict
+            ):
+                try container.encode("json_schema", forKey: .type)
+                var nestedContainer = container.nestedContainer(
+                    keyedBy: SchemaKey.self,
+                    forKey: .jsonSchema
+                )
+                try nestedContainer.encode(name, forKey: .name)
+                try nestedContainer.encodeIfPresent(description, forKey: .description)
+                try nestedContainer.encodeIfPresent(schema, forKey: .schema)
+                try nestedContainer.encodeIfPresent(strict, forKey: .strict)
             case .text:
                 try container.encode("text", forKey: .type)
             }
@@ -515,7 +598,7 @@ extension OpenAIChatCompletionRequestBody {
 
 // MARK: -
 extension OpenAIChatCompletionRequestBody {
-    public struct StreamOptions: Encodable {
+    nonisolated public struct StreamOptions: Encodable, Sendable {
        /// If set, an additional chunk will be streamed before the data: [DONE] message.
        /// The usage field on this chunk shows the token usage statistics for the entire request,
        /// and the choices field will always be an empty array. All other chunks will also include
@@ -530,7 +613,7 @@ extension OpenAIChatCompletionRequestBody {
 
 // MARK: -
 extension OpenAIChatCompletionRequestBody {
-    public enum Tool: Encodable {
+    nonisolated public enum Tool: Encodable, Sendable {
 
         /// A function that chatGPT can instruct us to call when appropriate
         ///
@@ -574,7 +657,7 @@ extension OpenAIChatCompletionRequestBody {
             allowedTools: [String]? = nil
         )
 
-        public enum RequireApproval: String, Codable {
+        nonisolated public enum RequireApproval: String, Codable, Sendable {
             case auto
             case manual
             case never
@@ -643,7 +726,7 @@ extension OpenAIChatCompletionRequestBody {
 // MARK: -
 extension OpenAIChatCompletionRequestBody {
     /// Controls which (if any) tool is called by the model.
-    public enum ToolChoice: Encodable {
+    nonisolated public enum ToolChoice: Encodable, Sendable {
 
         /// The model will not call any tool and instead generates a message.
         /// This is the default when no tools are present in the request body
@@ -692,18 +775,30 @@ extension OpenAIChatCompletionRequestBody {
     }
 }
 
+// MARK: -
 extension OpenAIChatCompletionRequestBody {
-    public struct WebSearchOptions: Encodable {
+    /// Constrains the verbosity of the model's response.
+    /// Lower values will result in more concise responses, while higher values will result in more verbose responses.
+    nonisolated public enum Verbosity: String, Encodable, Sendable {
+        case low
+        case medium
+        case high
+    }
+}
 
-        public enum SearchContextSize: String, Encodable {
+// MARK: -
+extension OpenAIChatCompletionRequestBody {
+    nonisolated public struct WebSearchOptions: Encodable, Sendable {
+
+        nonisolated public enum SearchContextSize: String, Encodable, Sendable {
             case low
             case medium
             case high
         }
 
-        public struct UserLocation: Encodable {
+        nonisolated public struct UserLocation: Encodable, Sendable {
 
-            public struct Approximate: Encodable {
+            nonisolated public struct Approximate: Encodable, Sendable {
                 let city: String?
                 let country: String?
                 let region: String?
@@ -747,4 +842,3 @@ extension OpenAIChatCompletionRequestBody {
         }
     }
 }
-

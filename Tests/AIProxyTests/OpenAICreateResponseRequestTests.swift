@@ -300,7 +300,7 @@ final class OpenAICreateResponseRequestTests: XCTestCase {
             reasoning: .init(effort: .minimal, summary: .auto),
             text: .init(verbosity: .high)
         )
-        
+
         XCTAssertEqual(
             """
             {
@@ -313,6 +313,105 @@ final class OpenAICreateResponseRequestTests: XCTestCase {
               "text" : {
                 "verbosity" : "high"
               }
+            }
+            """,
+            try requestBody.serialize(pretty: true)
+        )
+    }
+
+    func testResponseRequestWithMaxOutputTokens() throws {
+        let requestBody = OpenAICreateResponseRequestBody(
+            input: .text("Think hard"),
+            maxOutputTokens: 10000,
+            model: "gpt-5.1-codex-max",
+            reasoning: .init(
+                effort: .xhigh
+            )
+        )
+
+        XCTAssertEqual(
+            """
+            {
+              "input" : "Think hard",
+              "max_output_tokens" : 10000,
+              "model" : "gpt-5.1-codex-max",
+              "reasoning" : {
+                "effort" : "xhigh"
+              }
+            }
+            """,
+            try requestBody.serialize(pretty: true)
+        )
+    }
+
+    func testResponseRequestWithStoreAndInstructions() throws {
+        let requestBody = OpenAICreateResponseRequestBody(
+            input: .text("hello world"),
+            instructions: "You are an expert greeter",
+            model: "gpt-5.2",
+            store: false
+        )
+
+        XCTAssertEqual(
+            """
+            {
+              "input" : "hello world",
+              "instructions" : "You are an expert greeter",
+              "model" : "gpt-5.2",
+              "store" : false
+            }
+            """,
+            try requestBody.serialize(pretty: true)
+        )
+    }
+
+    func testResponseRequestWithTruncationAndContextManagement() throws {
+        let requestBody = OpenAICreateResponseRequestBody(
+            input: .text("Continue the long-running task"),
+            contextManagement: [
+                .init(compactThreshold: 200000)
+            ],
+            model: "gpt-5.3-codex",
+            truncation: .auto
+        )
+
+        XCTAssertEqual(
+            """
+            {
+              "context_management" : [
+                {
+                  "compact_threshold" : 200000,
+                  "type" : "compaction"
+                }
+              ],
+              "input" : "Continue the long-running task",
+              "model" : "gpt-5.3-codex",
+              "truncation" : "auto"
+            }
+            """,
+            try requestBody.serialize(pretty: true)
+        )
+    }
+
+    func testResponseRequestWithContextManagementCompactionOnlyType() throws {
+        let requestBody = OpenAICreateResponseRequestBody(
+            input: .text("hello"),
+            contextManagement: [
+                .init(type: .compaction, compactThreshold: nil)
+            ],
+            model: "gpt-4o"
+        )
+
+        XCTAssertEqual(
+            """
+            {
+              "context_management" : [
+                {
+                  "type" : "compaction"
+                }
+              ],
+              "input" : "hello",
+              "model" : "gpt-4o"
             }
             """,
             try requestBody.serialize(pretty: true)

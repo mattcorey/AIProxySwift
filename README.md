@@ -39,8 +39,7 @@ key secure and your AI bill predictable:
 
 # Installation
 
-
-## How to add this package as a dependency to your Xcode project
+## Installation using Xcode
 
 1. From within your Xcode project, select `File > Add Package Dependencies`
 
@@ -51,53 +50,81 @@ key secure and your AI bill predictable:
 
    <img src="https://github.com/lzell/AIProxySwift/assets/35940/fd76b588-5e19-4d4d-9748-8db3fd64df8e" alt="Set package rule" width="720">
 
-3. Call `AIProxy.configure` during app launch. In a SwiftUI app, you can add an `init` to your `MyApp.swift` file: 
 
-    ```swift
-    import AIProxy
+## Installation using cocoapods
 
-    @main
-    struct MyApp: App {
-        init() {
-            AIProxy.configure(
-                logLevel: .debug,
-                printRequestBodies: false,  // Flip to true for library development
-                printResponseBodies: false, // Flip to true for library development
-                resolveDNSOverTLS: true,
-                useStableID: false,         // Please see the docstring if you'd like to enable this
-            )
-        }
-        // ...
+Add to your podfile:
+
+    pod "AIProxy"
+
+Then, from shell:
+
+    pod install
+
+## How to configure the package for use with AIProxy
+
+We recommend using the AIProxy option `useStableID` to rate limit usage across an app store user's account on multiple devices.
+To enable this, please first add support for iCloud's key-value storage:
+
+1. Tap on your project in Xcode's project tree
+2. Select your target in the secondary sidebar
+3. Tap on Signing & Capabilities > Add Capability > iCloud
+4. Check the 'Key-Value storage' checkbox
+
+During your app's launch, call `AIProxy.configure`. Using this method, you can specify:
+
+- the log level that you'd like to see in your Xcode console from the AIProxy lib
+- whether to print request/response bodies to Xcode's console, which is useful for debugging or contributing to the library
+- whether to resolve DNS queries [using Cloudflare's DoT](https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-tls/) (recommended)
+- whether to use stable identifiers as client IDs (recommended)
+
+In a SwiftUI app, call `AIProxy.configure` in your app's composition root:
+
+```swift
+import AIProxy
+
+@main
+struct MyApp: App {
+    init() {
+        AIProxy.configure(
+            logLevel: .debug,
+            printRequestBodies: false,
+            printResponseBodies: false,
+            resolveDNSOverTLS: true,
+            useStableID: true
+        )
     }
-    ```
+    // ...
+}
+```
 
-   In a UIKit app, add `configure` to applicationDidFinishLaunching:
+In a UIKit app, call `AIProxy.configure` in applicationDidFinishLaunching:
 
-    ```swift
-    import AIProxy
+```swift
+import AIProxy
 
-    @UIApplicationMain
-    class AppDelegate: UIResponder, UIApplicationDelegate {
+@UIApplicationMain
+class AppDelegate: UIResponder, UIApplicationDelegate {
 
-        var window: UIWindow?
+    var window: UIWindow?
 
-        func application(_ application: UIApplication,
-                         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-            AIProxy.configure(
-                logLevel: .debug,
-                printRequestBodies: false,  // Flip to true for library development
-                printResponseBodies: false, // Flip to true for library development
-                resolveDNSOverTLS: true,
-                useStableID: true
-            )
-            // ...
-            return true
-        }
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        AIProxy.configure(
+            logLevel: .debug,
+            printRequestBodies: false,
+            printResponseBodies: false,
+            resolveDNSOverTLS: true,
+            useStableID: true
+        )
         // ...
+        return true
     }
-    ```
+    // ...
+}
+```
 
-### How to configure the package for use with AIProxy
+## How to configure the AIProxy backend for use with your project
 
 See the [AIProxy integration video](https://www.aiproxy.com/docs/integration-guide.html).
 Note that this is not required if you are shipping an app where the customers provide their own
@@ -107,9 +134,9 @@ If you are shipping an app using a personal or company API key, we highly recomm
 AIProxy as an alternative to building, monitoring, and maintaining your own backend.
 
 
-## How to update the package
+# How to update the package
 
-- If you set the dependency rule to `main` in step 2 above, then you can ensure the package is
+- If you set the dependency rule to `main` during installation, then you can ensure the package is
   up to date by right clicking on the package and selecting 'Update Package'
 
   <img src="https://github.com/lzell/AIProxySwift/assets/35940/aeee0ab2-362b-4995-b9ca-ff4e1dd04f47" alt="Update package version" width="720">
@@ -125,7 +152,7 @@ AIProxy as an alternative to building, monitoring, and maintaining your own back
   tree and select 'Update Package'.
 
 
-## How to contribute to the package
+# How to contribute to the package
 
 Your additions to AIProxySwift are welcome! I like to develop the library while working in an
 app that depends on it:
@@ -141,9 +168,6 @@ If you do that, then you can modify the source to AIProxySwift right from within
 Once you're happy with your changes, open a PR here.
 
 # Example usage
-
-Along with the snippets below, which you can copy and paste into your Xcode project, we also
-offer full demo apps to jump-start your development. Please see the [AIProxyBootstrap](https://github.com/lzell/AIProxyBootstrap) repo.
 
 * [OpenAI](#openai)
 * [Gemini](#gemini)
@@ -183,16 +207,25 @@ offer full demo apps to jump-start your development. Please see the [AIProxyBoot
     //     serviceURL: "service-url-from-your-developer-dashboard"
     // )
 
+    let requestBody = OpenAIChatCompletionRequestBody(
+        model: "gpt-5.2",
+        messages: [
+            .system(content: .text("You are a friendly assistant")),
+            .user(content: .text("hello world"))
+        ],
+        reasoningEffort: .noReasoning
+    )
+
     do {
-        let response = try await openAIService.chatCompletionRequest(body: .init(
-            model: "gpt-4o",
-            messages: [.user(content: .text("hello world"))]
-        ))
+        let response = try await openAIService.chatCompletionRequest(
+            body: requestBody,
+            secondsToWait: 120
+        )
         print(response.choices.first?.message.content ?? "")
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create OpenAI chat completion: \(error.localizedDescription)")
+        print("Could not create OpenAI chat completion: \(error)")
     }
 ```
 
@@ -215,11 +248,12 @@ This is useful for `o1` and `o3` models.
     // )
 
     let requestBody = OpenAIChatCompletionRequestBody(
-        model: "o3-mini",
+        model: "gpt-5.2",
         messages: [
           .developer(content: .text("You are a coding assistant")),
           .user(content: .text("Build a ruby service that writes latency stats to redis on each request"))
-        ]
+        ],
+        reasoningEffort: .high
     )
 
     do {
@@ -235,7 +269,7 @@ This is useful for `o1` and `o3` models.
     } catch let err as URLError where [.notConnectedToInternet, .networkConnectionLost].contains(err.code) {
         print("Could not complete OpenAI reasoning request. Please check your internet connection")
     } catch {
-        print("Could not complete OpenAI reasoning request: \(error.localizedDescription)")
+        print("Could not complete OpenAI reasoning request: \(error)")
     }
 ```
 
@@ -257,8 +291,9 @@ This is useful for `o1` and `o3` models.
     // )
 
     let requestBody = OpenAIChatCompletionRequestBody(
-        model: "gpt-4o-mini",
+        model: "gpt-5.2",
         messages: [.user(content: .text("hello world"))]
+        reasoningEffort: .noReasoning
     )
 
     do {
@@ -272,7 +307,7 @@ This is useful for `o1` and `o3` models.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create OpenAI streaming chat completion: \(error.localizedDescription)")
+        print("Could not create OpenAI streaming chat completion: \(error)")
     }
 ```
 
@@ -310,7 +345,7 @@ As an alternative, you can use the new ChatGPT Responses API to hold the entire 
     var completion1: OpenAIChatCompletionResponseBody? = nil
     do {
         completion1 = try await openAIService.chatCompletionRequest(body: .init(
-            model: "gpt-4o-mini",
+            model: "gpt-5-mini",
             messages: [
                 userMessage1
             ]
@@ -318,7 +353,7 @@ As an alternative, you can use the new ChatGPT Responses API to hold the entire 
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not get first chat completion: \(error.localizedDescription)")
+        print("Could not get first chat completion: \(error)")
     }
 
     // Get the contents of the model's first response:
@@ -340,7 +375,7 @@ As an alternative, you can use the new ChatGPT Responses API to hold the entire 
     var completion2: OpenAIChatCompletionResponseBody? = nil
     do {
         completion2 = try await openAIService.chatCompletionRequest(body: .init(
-            model: "gpt-4o-mini",
+            model: "gpt-5-mini",
             messages: [
                 userMessage1,
                 .assistant(content: .text(assistantContent1)),
@@ -350,7 +385,7 @@ As an alternative, you can use the new ChatGPT Responses API to hold the entire 
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not get second chat completion: \(error.localizedDescription)")
+        print("Could not get second chat completion: \(error)")
     }
 
     // Get the contents of the model's second response:
@@ -392,7 +427,7 @@ On macOS, use `NSImage(named:)` in place of `UIImage(named:)`
 
     do {
         let response = try await openAIService.chatCompletionRequest(body: .init(
-            model: "gpt-4o",
+            model: "gpt-5.2",
             messages: [
                 .system(
                     content: .text("Tell me what you see")
@@ -411,7 +446,7 @@ On macOS, use `NSImage(named:)` in place of `UIImage(named:)`
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create OpenAI multi-modal chat completion: \(error.localizedDescription)")
+        print("Could not create OpenAI multi-modal chat completion: \(error)")
     }
 ```
 
@@ -445,7 +480,7 @@ This snippet will print out the URL of an image generated with `dall-e-3`:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create an image with DALLE 3: \(error.localizedDescription)")
+        print("Could not create an image with DALLE 3: \(error)")
     }
 ```
 
@@ -485,7 +520,7 @@ This snippet will print out the URL of an image generated with `dall-e-3`:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create OpenAI image generation: \(error.localizedDescription)")
+        print("Could not create OpenAI image generation: \(error)")
     }
 ```
 
@@ -540,7 +575,7 @@ This snippet will print out the URL of an image generated with `dall-e-3`:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create OpenAI edit image generation: \(error.localizedDescription)")
+        print("Could not create OpenAI edit image generation: \(error)")
     }
 ```
 
@@ -609,7 +644,7 @@ This snippet will print out the URL of an image generated with `dall-e-3`:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create OpenAI edit image generation: \(error.localizedDescription)")
+        print("Could not create OpenAI edit image generation: \(error)")
     }
 ```
 
@@ -648,7 +683,7 @@ This snippet will print out the URL of an image generated with `dall-e-3`:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not make a web search completion call with OpenAI: \(error.localizedDescription)")
+        print("Could not make a web search completion call with OpenAI: \(error)")
     }
 ```
 
@@ -693,7 +728,7 @@ return JSON only:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create OpenAI chat completion in JSON mode: \(error.localizedDescription)")
+        print("Could not create OpenAI chat completion in JSON mode: \(error)")
     }
 ```
 
@@ -743,7 +778,7 @@ in its response:
             "additionalProperties": false
         ]
         let requestBody = OpenAIChatCompletionRequestBody(
-            model: "gpt-4o-2024-08-06",
+            model: "gpt-5.2",
             messages: [
                 .system(content: .text("Return valid JSON only, and follow the specified JSON structure")),
                 .user(content: .text("Return a peaches and cream color palette"))
@@ -760,7 +795,7 @@ in its response:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create OpenAI chat completion with structured outputs: \(error.localizedDescription)")
+        print("Could not create OpenAI chat completion with structured outputs: \(error)")
     }
 ```
 
@@ -802,7 +837,7 @@ For more examples, see the [original structured outputs announcement](https://op
     var completion1: OpenAIChatCompletionResponseBody? = nil
     do {
         completion1 = try await openAIService.chatCompletionRequest(body: .init(
-            model: "gpt-4o-mini",
+            model: "gpt-5.2",
             messages: [
                 userMessage
             ],
@@ -828,7 +863,7 @@ For more examples, see the [original structured outputs announcement](https://op
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not get first chat completion: \(error.localizedDescription)")
+        print("Could not get first chat completion: \(error)")
     }
 
     // Get the contents of the model's first response:
@@ -859,7 +894,7 @@ For more examples, see the [original structured outputs announcement](https://op
     do {
         completion2 = try await openAIService.chatCompletionRequest(
             body: .init(
-                model: "gpt-4o-mini",
+                model: "gpt-5.2",
                 messages: [
                     userMessage,
                     .assistant(
@@ -880,7 +915,7 @@ For more examples, see the [original structured outputs announcement](https://op
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not get second chat completion: \(error.localizedDescription)")
+        print("Could not get second chat completion: \(error)")
     }
 
     // Get the contents of the model's second response:
@@ -911,7 +946,7 @@ This example it taken from OpenAI's [function calling guide](https://platform.op
     //     serviceURL: "service-url-from-your-developer-dashboard"
     // )
     let requestBody = OpenAIChatCompletionRequestBody(
-        model: "gpt-4o-mini",
+        model: "gpt-5.2",
         messages: [
             .user(content: .text("What is the weather like in Paris today?")),
         ],
@@ -958,12 +993,56 @@ This example it taken from OpenAI's [function calling guide](https://platform.op
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not make a streaming tool call to OpenAI: \(error.localizedDescription)")
+        print("Could not make a streaming tool call to OpenAI: \(error)")
+    }
+```
+
+### How to transcribe audio with OpenAI
+1. Record an audio file in quicktime and save it as "helloworld.m4a"
+2. Add the audio file to your Xcode project. Make sure it's included in your target: select your audio file in the project tree, type `cmd-opt-0` to open the inspect panel, and view `Target Membership`
+3. Run this snippet:
+
+```swift
+    import AIProxy
+
+    /* Uncomment for BYOK use cases */
+    // let openAIService = AIProxy.openAIDirectService(
+    //     unprotectedAPIKey: "your-openai-key"
+    // )
+
+    /* Uncomment for all other production use cases */
+    // let openAIService = AIProxy.openAIService(
+    //     partialKey: "partial-key-from-your-developer-dashboard",
+    //     serviceURL: "service-url-from-your-developer-dashboard"
+    // )
+
+    guard let url = Bundle.main.url(forResource: "helloworld", withExtension: "m4a"),
+          let fileContents = try? Data(contentsOf: url)
+    else {
+        print("Could not read file contents of helloworld.m4a")
+        return
+    }
+
+    do {
+        let requestBody = OpenAICreateTranscriptionRequestBody(
+            file: fileContents,
+            model: "gpt-4o-mini-transcribe",
+            responseFormat: "text"
+        )
+        let response = try await openAIService.createTranscriptionRequest(
+            body: requestBody,
+            secondsToWait: 120
+        )
+        print(response.text)
+    } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
+        print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
+    } catch {
+        print("Could not transcribe audio with OpenAI: \(error)")
     }
 ```
 
 
-### How to get Whisper word-level timestamps in an audio transcription
+### How to get Whisper word-level timestamps in an audio transcription with OpenAI
 
 1. Record an audio file in quicktime and save it as "helloworld.m4a"
 2. Add the audio file to your Xcode project. Make sure it's included in your target: select your audio file in the project tree, type `cmd-opt-0` to open the inspect panel, and view `Target Membership`
@@ -983,10 +1062,16 @@ This example it taken from OpenAI's [function calling guide](https://platform.op
     //     serviceURL: "service-url-from-your-developer-dashboard"
     // )
 
+    guard let url = Bundle.main.url(forResource: "helloworld", withExtension: "m4a"),
+          let fileContents = try? Data(contentsOf: url)
+    else {
+        print("Could not read file contents of helloworld.m4a")
+        return
+    }
+
     do {
-        let url = Bundle.main.url(forResource: "helloworld", withExtension: "m4a")!
         let requestBody = OpenAICreateTranscriptionRequestBody(
-            file: try Data(contentsOf: url),
+            file: fileContents,
             model: "whisper-1",
             responseFormat: "verbose_json",
             timestampGranularities: [.word, .segment]
@@ -1000,7 +1085,7 @@ This example it taken from OpenAI's [function calling guide](https://platform.op
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not get word-level timestamps from OpenAI: \(error.localizedDescription)")
+        print("Could not get word-level timestamps from OpenAI: \(error)")
     }
 ```
 
@@ -1042,7 +1127,7 @@ This example it taken from OpenAI's [function calling guide](https://platform.op
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create OpenAI TTS audio: \(error.localizedDescription)")
+        print("Could not create OpenAI TTS audio: \(error)")
     }
 ```
 
@@ -1194,14 +1279,16 @@ This example it taken from OpenAI's [function calling guide](https://platform.op
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not perform embedding request to OpenAI: \(error.localizedDescription)")
+        print("Could not perform embedding request to OpenAI: \(error)")
     }
 ```
 
 
-### How use realtime audio with OpenAI 
+### How to use realtime audio with OpenAI
 
 Use this example to have a conversation with OpenAI's realtime models.
+
+If you're building for iOS, see the [OpenAI realtime starter](https://github.com/lzell/OpenAIRealtimeSample) project for a jumping off point.
 
 We recommend getting a basic chat completion with OpenAI working before attempting realtime.
 Realtime is a more involved integration (as you can see from the code snippet below), and
@@ -1243,7 +1330,7 @@ struct ContentView: View {
             do {
                 try await realtimeManager.startConversation()
             } catch {
-                print("Could not start OpenAI realtime: \(error.localizedDescription)")
+                print("Could not start OpenAI realtime: \(error)")
             }
         }
     }
@@ -1264,7 +1351,7 @@ struct ContentView: View {
 }
 
 
-@RealtimeActor
+@AIProxyActor
 final class RealtimeManager {
     private var realtimeSession: OpenAIRealtimeSession?
     private var audioController: AudioController?
@@ -1286,7 +1373,10 @@ final class RealtimeManager {
         // Set to false if you want your user to speak first
         let aiSpeaksFirst = true
 
-        let audioController = try await AudioController(modes: [.playback, .record])
+        let audioController = try await AudioController(
+            modes: [.playback, .record],
+            useManualEchoCancellation: true
+        )
         let micStream = try audioController.micStream()
 
         // Start the realtime session:
@@ -1295,7 +1385,7 @@ final class RealtimeManager {
             inputAudioTranscription: .init(model: "whisper-1"),
             instructions: "You are a tour guide of Yosemite national park",
             maxResponseOutputTokens: .int(4096),
-            modalities: [.audio, .text],
+            modalities: [.audio],
             outputAudioFormat: .pcm16,
             temperature: 0.7,
             turnDetection: .init(
@@ -1305,7 +1395,7 @@ final class RealtimeManager {
         )
 
         let realtimeSession = try await openAIService.realtimeSession(
-            model: "gpt-4o-mini-realtime-preview-2024-12-17",
+            model: "gpt-realtime-1.5",
             configuration: configuration,
             logLevel: .debug
         )
@@ -1334,8 +1424,8 @@ final class RealtimeManager {
                     } else {
                         isOpenAIReadyForAudio = true
                     }
-                case .responseAudioDelta(let base64String):
-                    audioController.playPCM16Audio(base64String: base64String)
+                case .responseAudioDelta(let delta):
+                    audioController.playPCM16Audio(base64String: delta.base64String)
                 case .inputAudioBufferSpeechStarted:
                     audioController.interruptPlayback()
                 case .responseCreated:
@@ -1359,6 +1449,30 @@ final class RealtimeManager {
 }
 ```
 
+#### General Availability (GA) Realtime migration notes
+
+- OpenAI has announced Realtime beta (`OpenAI-Beta: realtime=v1`) deprecation and shutdown on 2026-05-07.
+- For `response.create`, GA uses `output_modalities` (not `modalities`).
+- The new `output_modalities` for OpenAI realtime GA (general availability) is as follows:
+  - `["audio"]` returns audio with transcript.
+  - `["text"]` returns text only.
+- For voice mode with built-in web search, use GA tool (`.webSearch`) and specify `.auto` for toolChoice to let the model decide when to use it.
+
+```swift
+let configuration = OpenAIRealtimeSessionConfiguration(
+    outputModalities: [.audio],
+    voice: .builtin("alloy"),
+    tools: [.webSearch(.init(searchContextSize: .medium))],
+    toolChoice: .auto
+)
+
+let session = try await openAIService.realtimeSession(
+    model: "gpt-realtime",
+    configuration: configuration,
+    logLevel: .info
+)
+```
+
 ### How to make a basic request using OpenAI's Responses API
 Note: there is also a streaming version of this snippet below.
 
@@ -1378,10 +1492,10 @@ Note: there is also a streaming version of this snippet below.
 
     let requestBody = OpenAICreateResponseRequestBody(
         input: .text("hello world"),
-        model: "gpt-5",
-        reasoning: .init(effort: .minimal, summary: .detailed),  // Optional: Use minimal effort with auto summary
+        model: "gpt-5.1",
+        reasoning: .init(effort: .noReasoning),
         text: .init(verbosity: .high),                           // Optional: Use low verbosity for concise responses
-        previousResponseId: nil                                  // Pass this in on future requests to save chat history
+        previousResponseId: nil                                  // Pass this on future requests to save chat history
     )
 
     do {
@@ -1390,7 +1504,66 @@ Note: there is also a streaming version of this snippet below.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not get a text response from OpenAI: \(error.localizedDescription)")
+        print("Could not get a text response from OpenAI: \(error)")
+    }
+```
+
+### How to make a tool call request with OpenAI's Responses API
+
+```swift
+    import AIProxy
+
+    /* Uncomment for BYOK use cases */
+    // let openAIService = AIProxy.openAIDirectService(
+    //     unprotectedAPIKey: "your-openai-key"
+    // )
+
+    /* Uncomment for all other production use cases */
+    // let openAIService = AIProxy.openAIService(
+    //     partialKey: "partial-key-from-your-developer-dashboard",
+    //     serviceURL: "service-url-from-your-developer-dashboard"
+    // )
+
+    let schema: [String: AIProxyJSONValue] = [
+        "type": "object",
+        "properties": [
+            "location": [
+                "type": "string",
+                "description": "City and country e.g. Bogotá, Colombia"
+            ]
+        ],
+        "required": ["location"],
+        "additionalProperties": false
+    ]
+
+    let requestBody = OpenAICreateResponseRequestBody(
+        input: .text("What is the weather like in Paris today?"),
+        model: "gpt-4o",
+        tools: [
+            .function(
+                .init(
+                    name: "get_weather",
+                    parameters: schema
+                )
+            )
+        ]
+    )
+
+    do {
+        let response = try await openAIService.createResponse(
+            requestBody: requestBody,
+            secondsToWait: 60
+        )
+        if case .functionCall(let functionCall) = response.output.first {
+            print("""
+                  The model wants to call function: \(functionCall.name)
+                  with arguments: \(functionCall.arguments)")
+                  """)
+        }
+    } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
+        print("Received \(statusCode) status code with response body: \(responseBody)")
+    } catch {
+        print("Could not create a tool call response from OpenAI: \(error)")
     }
 ```
 
@@ -1460,7 +1633,7 @@ Note: there is also a streaming version of this snippet below.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not get a structured output response from OpenAI: \(error.localizedDescription)")
+        print("Could not get a structured output response from OpenAI: \(error)")
     }
 ```
 
@@ -1500,7 +1673,7 @@ Please also see the Structured Outputs snippet above, which is a more modern way
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not get a JSON mode response from OpenAI: \(error.localizedDescription)")
+        print("Could not get a JSON mode response from OpenAI: \(error)")
     }
 ```
 
@@ -1558,7 +1731,7 @@ Please also see the Structured Outputs snippet above, which is a more modern way
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create a multi-modal OpenAI Response: \(error.localizedDescription)")
+        print("Could not create a multi-modal OpenAI Response: \(error)")
     }
 ```
 
@@ -1593,7 +1766,7 @@ Note: there is also a streaming version of this snippet below.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not get web search result from OpenAI: \(error.localizedDescription)")
+        print("Could not get web search result from OpenAI: \(error)")
     }
 ```
 
@@ -1636,7 +1809,7 @@ Replace the `fileID` with the ID returned from the snippet `How to upload a file
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not prompt with file contents: \(error.localizedDescription)")
+        print("Could not prompt with file contents: \(error)")
     }
 ```
 
@@ -1689,7 +1862,7 @@ Replace the `fileID` with the ID returned from the snippet `How to upload a file
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not prompt with image inputs: \(error.localizedDescription)")
+        print("Could not prompt with image inputs: \(error)")
     }
 ```
 
@@ -1723,7 +1896,7 @@ Replace the `fileID` with the ID returned from the snippet `How to upload a file
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create an OpenAI vector store: \(error.localizedDescription)")
+        print("Could not create an OpenAI vector store: \(error)")
     }
 ```
 
@@ -1757,7 +1930,7 @@ Replace the `fileID` with the ID returned from the snippet `How to upload a file
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create an OpenAI vector store: \(error.localizedDescription)")
+        print("Could not create an OpenAI vector store: \(error)")
     }
 ```
 
@@ -1801,7 +1974,7 @@ This will upload the pdf to OpenAI for use in a future vector store request:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not upload file to OpenAI: \(error.localizedDescription)")
+        print("Could not upload file to OpenAI: \(error)")
     }
 ```
 
@@ -1841,7 +2014,7 @@ You'll need two IDs for this snippet:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create an OpenAI vector store file: \(error.localizedDescription)")
+        print("Could not create an OpenAI vector store file: \(error)")
     }
 ```
 
@@ -1878,7 +2051,7 @@ You'll need two IDs for this snippet:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not get a streaming response from OpenAI: \(error.localizedDescription)")
+        print("Could not get a streaming response from OpenAI: \(error)")
     }
 ```
 
@@ -1936,7 +2109,7 @@ You'll need two IDs for this snippet:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not get a streaming response from OpenAI: \(error.localizedDescription)")
+        print("Could not get a streaming response from OpenAI: \(error)")
     }
 ```
 
@@ -1977,7 +2150,7 @@ You'll need two IDs for this snippet:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not get a text response from OpenAI: \(error.localizedDescription)")
+        print("Could not get a text response from OpenAI: \(error)")
     }
 ```
 
@@ -2032,7 +2205,7 @@ Once your files are added and processed, you can run this snippet on your `vecto
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not get a text response from OpenAI: \(error.localizedDescription)")
+        print("Could not get a text response from OpenAI: \(error)")
     }
 ```
 
@@ -2092,7 +2265,7 @@ Once your files are added and processed, you can run this snippet on your `vecto
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not get a text response from OpenAI: \(error.localizedDescription)")
+        print("Could not get a text response from OpenAI: \(error)")
     }
 }
 ```
@@ -2113,6 +2286,275 @@ You can use all of the OpenAI snippets aboves with one change. Initialize the Op
 
 ***
 
+## OpenAI Conversations API
+
+### How to create an OpenAI conversation
+
+```swift
+    import AIProxy
+
+    /* Uncomment for BYOK use cases */
+    // let openAIService = AIProxy.openAIDirectService(
+    //     unprotectedAPIKey: "your-openai-key"
+    // )
+
+    /* Uncomment for all other production use cases */
+    // let openAIService = AIProxy.openAIService(
+    //     partialKey: "partial-key-from-your-developer-dashboard",
+    //     serviceURL: "service-url-from-your-developer-dashboard"
+    // )
+
+    let requestBody = OpenAICreateConversationRequestBody(
+        items: [
+            .item(
+                .inputMessage(OpenAIInputMessage(content: "Hello world", role: .user))
+            )
+        ],
+        metadata: ["topic": "demo"]
+    )
+
+    do {
+         let response = try await openAIService.createConversation(
+             requestBody: requestBody,
+             secondsToWait: 120
+         )
+        print("Created conversation with ID: \(response.id)")
+    } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
+        print("Received \(statusCode) status code with response body: \(responseBody)")
+    } catch {
+        print("Could not create OpenAI Conversation: \(error)")
+    }
+```
+
+### How to get an OpenAI conversation
+
+```swift
+    import AIProxy
+
+    /* Uncomment for BYOK use cases */
+    // let openAIService = AIProxy.openAIDirectService(
+    //     unprotectedAPIKey: "your-openai-key"
+    // )
+
+    /* Uncomment for all other production use cases */
+    // let openAIService = AIProxy.openAIService(
+    //     partialKey: "partial-key-from-your-developer-dashboard",
+    //     serviceURL: "service-url-from-your-developer-dashboard"
+    // )
+
+    do {
+        let response = try await openAIService.getConversation(
+            conversationID: "<conversation-id>",
+            secondsToWait: 120
+        )
+        print("Retreived conversation with ID \(response.id) and metadata: \(response.metadata)")
+    } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
+        print("Received \(statusCode) status code with response body: \(responseBody)")
+    } catch {
+        print("Could not get OpenAI Conversation: \(error)")
+    }
+```
+
+### How to list OpenAI conversation items
+
+```swift
+    import AIProxy
+
+    /* Uncomment for BYOK use cases */
+    // let openAIService = AIProxy.openAIDirectService(
+    //     unprotectedAPIKey: "your-openai-key"
+    // )
+
+    /* Uncomment for all other production use cases */
+    // let openAIService = AIProxy.openAIService(
+    //     partialKey: "partial-key-from-your-developer-dashboard",
+    //     serviceURL: "service-url-from-your-developer-dashboard"
+    // )
+
+    do {
+        let response = try await openAIService.listItems(
+            conversationID: "<conversation-id>",
+            include: [.messageOutputTextLogprobs],
+            secondsToWait: 120
+        )
+        print("Retreived conversation with ID \(response.data)")
+    } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
+        print("Received \(statusCode) status code with response body: \(responseBody)")
+    } catch {
+        print("Could not list OpenAI conversation items: \(error)")
+    }
+```
+
+### How to add items to an OpenAI conversation
+
+```swift
+    import AIProxy
+
+    /* Uncomment for BYOK use cases */
+    // let openAIService = AIProxy.openAIDirectService(
+    //     unprotectedAPIKey: "your-openai-key"
+    // )
+
+    /* Uncomment for all other production use cases */
+    // let openAIService = AIProxy.openAIService(
+    //     partialKey: "partial-key-from-your-developer-dashboard",
+    //     serviceURL: "service-url-from-your-developer-dashboard"
+    // )
+
+    let createConversationBody = OpenAICreateConversationRequestBody(
+        metadata: ["purpose": "item_creation_test"]
+    )
+
+    do {
+        let conversation = try await openAIService.createConversation(
+            requestBody: createConversationBody,
+            secondsToWait: 120
+        )
+        print("Created conversation: \(conversation.id)")
+
+        let createItemsBody = OpenAICreateConversationItemsRequestBody(
+            items: [
+                .item(
+                    .inputMessage(OpenAIInputMessage(content: "What is the capital of France?", role: .user))
+                )
+            ]
+        )
+
+        let response = try await openAIService.createItems(
+            conversationID: conversation.id,
+            requestBody: createItemsBody,
+            secondsToWait: 120
+        )
+        print("Created \(response.data.count) items in conversation")
+        print("First item ID: \(response.firstID)")
+        print("Last item ID: \(response.lastID)")
+    } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
+        print("Received \(statusCode) status code with response body: \(responseBody)")
+    } catch {
+        print("Could not create conversation items: \(error)")
+    }
+```
+
+### How to delete an item from an OpenAI conversation
+
+```swift
+    import AIProxy
+
+    /* Uncomment for BYOK use cases */
+    // let openAIService = AIProxy.openAIDirectService(
+    //     unprotectedAPIKey: "your-openai-key"
+    // )
+
+    /* Uncomment for all other production use cases */
+    // let openAIService = AIProxy.openAIService(
+    //     partialKey: "partial-key-from-your-developer-dashboard",
+    //     serviceURL: "service-url-from-your-developer-dashboard"
+    // )
+
+    do {
+        let result = try await openAIService.deleteItem(
+            conversationID: <conversation-id>,
+            itemID: <item-id>,
+            secondsToWait: 120
+        )
+        print("Deleted conversation item with id: \(result.id)")
+    } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
+        print("Received \(statusCode) status code with response body: \(responseBody)")
+    } catch {
+        print("Could not delete conversation item: \(error)")
+    }
+```
+
+### How to delete an OpenAI conversation
+
+```swift
+    import AIProxy
+
+    /* Uncomment for BYOK use cases */
+    // let openAIService = AIProxy.openAIDirectService(
+    //     unprotectedAPIKey: "your-openai-key"
+    // )
+
+    /* Uncomment for all other production use cases */
+    // let openAIService = AIProxy.openAIService(
+    //     partialKey: "partial-key-from-your-developer-dashboard",
+    //     serviceURL: "service-url-from-your-developer-dashboard"
+    // )
+
+    do {
+        let response = try await openAIService.deleteConversation(
+            conversationID: "<conversation-id>",
+            secondsToWait: 120
+        )
+        print("Conversation with ID \(response.id) has been deleted: \(response.deleted)")
+    } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
+        print("Received \(statusCode) status code with response body: \(responseBody)")
+    } catch {
+        print("Could not delete OpenAI Conversation: \(error)")
+    }
+```
+
+### How to list OpenAI conversation items with pagination
+
+```swift
+    import AIProxy
+
+    /* Uncomment for BYOK use cases */
+    // let openAIService = AIProxy.openAIDirectService(
+    //     unprotectedAPIKey: "your-openai-key"
+    // )
+
+    /* Uncomment for all other production use cases */
+    // let openAIService = AIProxy.openAIService(
+    //     partialKey: "partial-key-from-your-developer-dashboard",
+    //     serviceURL: "service-url-from-your-developer-dashboard"
+    // )
+
+    let createConversationBody = OpenAICreateConversationRequestBody(
+        items: [
+            .item(.inputMessage(OpenAIInputMessage(content: "Page 1 - Item 1", role: .user))),
+            .item(.inputMessage(OpenAIInputMessage(content: "Page 1 - Item 2", role: .user))),
+            .item(.inputMessage(OpenAIInputMessage(content: "Page 2 - Item 1", role: .user))),
+            .item(.inputMessage(OpenAIInputMessage(content: "Page 2 - Item 2", role: .user)))
+        ],
+        metadata: ["purpose": "pagination_test"]
+    )
+
+    do {
+        let conversation = try await openAIService.createConversation(
+            requestBody: createConversationBody,
+            secondsToWait: 120
+        )
+        print("Created conversation: \(conversation.id)")
+
+        let page1 = try await openAIService.listItems(
+            conversationID: conversation.id,
+            limit: 2,
+            order: .asc,
+            secondsToWait: 120
+        )
+        print("Page 1: \(page1.data.count) items")
+        print("Has more: \(page1.hasMore)")
+
+        if page1.hasMore {
+            let page2 = try await openAIService.listItems(
+                conversationID: conversation.id,
+                after: page1.lastID,
+                limit: 2,
+                order: .asc,
+                secondsToWait: 120
+            )
+            print("Page 2: \(page2.data.count) items")
+            print("Has more: \(page2.hasMore)")
+        }
+    } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
+        print("Received \(statusCode) status code with response body: \(responseBody)")
+    } catch {
+        print("Could not paginate conversation items: \(error)")
+    }
+```
+
+***
 
 ## Gemini
 
@@ -2138,13 +2580,12 @@ You can use all of the OpenAI snippets aboves with one change. Initialize the Op
                 parts: [.text("How do I use product xyz?")]
             )
         ],
-        generationConfig: .init(maxOutputTokens: 1024),
         systemInstruction: .init(parts: [.text("Introduce yourself as a customer support person")])
     )
     do {
         let response = try await geminiService.generateContentRequest(
             body: requestBody,
-            model: "gemini-2.0-flash-exp",
+            model: "gemini-2.5-flash",
             secondsToWait: 60
         )
         for part in response.candidates?.first?.content?.parts ?? [] {
@@ -2169,7 +2610,7 @@ You can use all of the OpenAI snippets aboves with one change. Initialize the Op
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create Gemini generate content request: \(error.localizedDescription)")
+        print("Could not create Gemini generate content request: \(error)")
     }
 ```
 
@@ -2195,7 +2636,6 @@ You can use all of the OpenAI snippets aboves with one change. Initialize the Op
                 parts: [.text("How do I use product xyz?")]
             )
         ],
-        generationConfig: .init(maxOutputTokens: 1024),
         safetySettings: [
             .init(category: .dangerousContent, threshold: .none),
             .init(category: .civicIntegrity, threshold: .none),
@@ -2208,7 +2648,7 @@ You can use all of the OpenAI snippets aboves with one change. Initialize the Op
     do {
         let stream = try await geminiService.generateStreamingContentRequest(
             body: requestBody,
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash",
             secondsToWait: 60
         )
         for try await chunk in stream {
@@ -2222,7 +2662,7 @@ You can use all of the OpenAI snippets aboves with one change. Initialize the Op
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not generate Gemini streaming content: \(error.localizedDescription)")
+        print("Could not generate Gemini streaming content: \(error)")
     }
 ```
 
@@ -2290,7 +2730,7 @@ You can use all of the OpenAI snippets aboves with one change. Initialize the Op
     do {
         let response = try await geminiService.generateContentRequest(
             body: requestBody,
-            model: "gemini-2.0-flash-exp",
+            model: "gemini-2.5-flash",
             secondsToWait: 60
         )
         for part in response.candidates?.first?.content?.parts ?? [] {
@@ -2315,7 +2755,7 @@ You can use all of the OpenAI snippets aboves with one change. Initialize the Op
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create Gemini tool (function) call: \(error.localizedDescription)")
+        print("Could not create Gemini tool (function) call: \(error)")
     }
 ```
 
@@ -2362,7 +2802,7 @@ credits that you can put towards Gemini.
     do {
         let response = try await geminiService.generateContentRequest(
             body: requestBody,
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash",
             secondsToWait: 60
         )
         for candidate in response.candidates ?? [] {
@@ -2383,7 +2823,7 @@ credits that you can put towards Gemini.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create Gemini google search grounding request: \(error.localizedDescription)")
+        print("Could not create Gemini google search grounding request: \(error)")
     }
 ```
 
@@ -2426,7 +2866,7 @@ Add a file called `helloworld.m4a` to your Xcode assets before running this samp
         )
         let response = try await geminiService.generateContentRequest(
             body: requestBody,
-            model: "gemini-1.5-flash",
+            model: "gemini-2.5-flash",
             secondsToWait: 60
         )
         for part in response.candidates?.first?.content?.parts ?? [] {
@@ -2451,7 +2891,7 @@ Add a file called `helloworld.m4a` to your Xcode assets before running this samp
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create transcript with Gemini: \(error.localizedDescription)")
+        print("Could not create transcript with Gemini: \(error)")
     }
 ```
 
@@ -2506,7 +2946,7 @@ Add a file called 'my-image.jpg' to Xcode app assets. Then run this snippet:
         )
         let response = try await geminiService.generateContentRequest(
             body: requestBody,
-            model: "gemini-1.5-flash",
+            model: "gemini-2.5-flash",
             secondsToWait: 60
         )
         for part in response.candidates?.first?.content?.parts ?? [] {
@@ -2531,7 +2971,7 @@ Add a file called 'my-image.jpg' to Xcode app assets. Then run this snippet:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create Gemini generate content request: \(error.localizedDescription)")
+        print("Could not create Gemini generate content request: \(error)")
     }
 ```
 
@@ -2576,7 +3016,7 @@ If you use a file like `my-movie.mp4`, change the mime type from `video/quicktim
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not upload file to Gemini: \(error.localizedDescription)")
+        print("Could not upload file to Gemini: \(error)")
     }
 ```
 
@@ -2601,7 +3041,6 @@ Use the file URL returned from the snippet above.
     // )
 
     let requestBody = GeminiGenerateContentRequestBody(
-        model: "gemini-1.5-flash",
         contents: [
             .init(
                 parts: [
@@ -2625,7 +3064,7 @@ Use the file URL returned from the snippet above.
     do {
         let response = try await geminiService.generateContentRequest(
             body: requestBody,
-            model: "gemini-1.5-flash",
+            model: "gemini-2.5-flash",
             secondsToWait: 60
         )
         for part in response.candidates?.first?.content?.parts ?? [] {
@@ -2650,7 +3089,7 @@ Use the file URL returned from the snippet above.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create Gemini vision request: \(error.localizedDescription)")
+        print("Could not create Gemini vision request: \(error)")
     }
 ```
 
@@ -2678,7 +3117,7 @@ Use the file URL returned from the snippet above.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not delete file from Gemini temporary storage: \(error.localizedDescription)")
+        print("Could not delete file from Gemini temporary storage: \(error)")
     }
 ```
 
@@ -2729,7 +3168,7 @@ Use the file URL returned from the snippet above.
         )
         let response = try await geminiService.generateContentRequest(
             body: requestBody,
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash",
             secondsToWait: 60
         )
         for part in response.candidates?.first?.content?.parts ?? [] {
@@ -2751,7 +3190,7 @@ Use the file URL returned from the snippet above.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create Gemini generate content request: \(error.localizedDescription)")
+        print("Could not create Gemini generate content request: \(error)")
     }
 ```
 
@@ -2825,7 +3264,7 @@ Use the file URL returned from the snippet above.
     do {
         let response = try await geminiService.generateContentRequest(
             body: requestBody,
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash",
             secondsToWait: 60
         )
         for part in response.candidates?.first?.content?.parts ?? [] {
@@ -2836,11 +3275,11 @@ Use the file URL returned from the snippet above.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create Gemini generate content request: \(error.localizedDescription)")
+        print("Could not create Gemini generate content request: \(error)")
     }
 ```
 
-### How to generate an image with Gemini
+### How to generate an image with Gemini Nano Banana Pro
 
 ```swift
     import AIProxy
@@ -2871,6 +3310,9 @@ Use the file URL returned from the snippet above.
             )
         ],
         generationConfig: .init(
+            imageConfig: .init(
+                aspectRatio: "5:4",
+            ),
             responseModalities: [
                 "Text",
                 "Image"
@@ -2888,7 +3330,7 @@ Use the file URL returned from the snippet above.
     do {
         let response = try await geminiService.generateContentRequest(
             body: requestBody,
-            model: "gemini-2.0-flash-exp-image-generation",
+            model: "gemini-3-pro-image-preview",
             secondsToWait: 120
         )
         for part in response.candidates?.first?.content?.parts ?? [] {
@@ -2899,12 +3341,12 @@ Use the file URL returned from the snippet above.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create image using gemini: \(error.localizedDescription)")
+        print("Could not create image using gemini: \(error)")
     }
 ```
 
 
-### How to generate an image with Gemini and Imagen
+### How to generate an image with Imagen
 
 ```swift
     import AIProxy
@@ -2946,7 +3388,7 @@ Use the file URL returned from the snippet above.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create Imagen image: \(error.localizedDescription)")
+        print("Could not create Imagen image: \(error)")
     }
 ```
 
@@ -3023,7 +3465,7 @@ Use the file URL returned from the snippet above.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create Gemini image edit request: \(error.localizedDescription)")
+        print("Could not create Gemini image edit request: \(error)")
     }
 ```
 
@@ -3098,7 +3540,7 @@ Use the file URL returned from the snippet above.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create speech using Gemini: \(error.localizedDescription)")
+        print("Could not create speech using Gemini: \(error)")
     }
 ```
 
@@ -3192,7 +3634,7 @@ Use the file URL returned from the snippet above.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create multi-speaker speech using Gemini: \(error.localizedDescription)")
+        print("Could not create multi-speaker speech using Gemini: \(error)")
     }
 ```
 
@@ -3202,7 +3644,7 @@ Use the file URL returned from the snippet above.
 
 ## Anthropic
 
-### How to send an Anthropic message request
+### How to make an Anthropic message request
 
 ```swift
     import AIProxy
@@ -3218,31 +3660,44 @@ Use the file URL returned from the snippet above.
     //     serviceURL: "service-url-from-your-developer-dashboard"
     // )
 
+    let requestBody = AnthropicMessageRequestBody(
+        maxTokens: 8192,
+        messages: [
+            // You can choose your level of sugar here. The most concise option is:
+            AnthropicMessageParam(content: "hello world", role: .user)
+            //
+            // Or, for more flexibility (e.g. adding images, tools, etc.):
+            // AnthropicInputMessage(content: [.textBlock("hello world")], role: .user)
+            //
+            // Or, to fully spell out the call (this helps with Xcode's cmd-click to jump to source):
+            // AnthropicInputMessage(
+            //     content: .blocks([
+            //         .textBlock(AnthropicTextBlockParam(text: "hello world"))
+            //     ]),
+            //     role: .user
+            // )
+        ],
+        model: "claude-haiku-4-5-20251001",
+        system: "You are a friendly assistant"
+    )
+
     do {
-        let response = try await anthropicService.messageRequest(body: AnthropicMessageRequestBody(
-            maxTokens: 1024,
-            messages: [
-                AnthropicInputMessage(content: [.text("hello world")], role: .user)
-            ],
-            model: "claude-3-5-sonnet-20240620"
-        ))
-        for content in response.content {
-            switch content {
-            case .text(let message):
-                print("Claude sent a message: \(message)")
-            case .toolUse(id: _, name: let toolName, input: let toolInput):
-                print("Claude used a tool \(toolName) with input: \(toolInput)")
-            }
+        let response = try await anthropicService.messageRequest(
+            body: requestBody,
+            secondsToWait: 120
+        )
+        for case let .textBlock(textBlock) in response.content {
+            print("Received text from Claude: \(textBlock.text)")
         }
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
-        print("Received \(statusCode) status code with response body: \(responseBody)")
+        print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create an Anthropic message: \(error.localizedDescription)")
+        print("Could not create an Anthropic message: \(error)")
     }
 ```
 
 
-### How to use streaming text messages with Anthropic
+### How to make an Anthropic streaming message request
 
 ```swift
     import AIProxy
@@ -3258,36 +3713,35 @@ Use the file URL returned from the snippet above.
     //     serviceURL: "service-url-from-your-developer-dashboard"
     // )
 
-    do {
-        let requestBody = AnthropicMessageRequestBody(
-            maxTokens: 1024,
-            messages: [
-                .init(
-                    content: [.text("hello world")],
-                    role: .user
-                )
-            ],
-            model: "claude-3-5-sonnet-20240620"
-        )
+    let requestBody = AnthropicMessageRequestBody(
+        maxTokens: 1024,
+        messages: [
+            AnthropicMessageParam(
+                content: "Hello world",
+                role: .user
+            )
+        ],
+        model: "claude-haiku-4-5-20251001"
+    )
 
-        let stream = try await anthropicService.streamingMessageRequest(body: requestBody)
-        for try await chunk in stream {
-            switch chunk {
-            case .text(let text):
-                print(text)
-            case .toolUse(name: let toolName, input: let toolInput):
-                print("Claude wants to call tool \(toolName) with input \(toolInput)")
+    do {
+        let stream = try await anthropicService.streamingMessageRequest(
+            body: requestBody,
+            secondsToWait: 120
+        )
+        for try await case .contentBlockDelta(let contentBlockDelta) in stream {
+            if case .textDelta(let textDelta) = contentBlockDelta.delta {
+                print("Received a text delta from Claude: \(textDelta.text)")
             }
         }
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not use Anthropic's message stream: \(error.localizedDescription)")
+        print("Could not create a streaming Anthropic message: \(error)")
     }
 ```
 
-
-### How to use streaming tool calls with Anthropic
+### How to make an Anthropic message request with tool calls
 
 ```swift
     import AIProxy
@@ -3303,18 +3757,18 @@ Use the file URL returned from the snippet above.
     //     serviceURL: "service-url-from-your-developer-dashboard"
     // )
 
-    do {
-        let requestBody = AnthropicMessageRequestBody(
-            maxTokens: 1024,
-            messages: [
-                .init(
-                    content: [.text("What is nvidia's stock price?")],
-                    role: .user
-                )
-            ],
-            model: "claude-3-5-sonnet-20240620",
-            tools: [
-                .init(
+    let requestBody = AnthropicMessageRequestBody(
+        maxTokens: 8192,
+        messages: [
+            AnthropicMessageParam(
+                content: "What is Apple's stock price?",
+                role: .user
+            )
+        ],
+        model: "claude-haiku-4-5-20251001",
+        tools: [
+            .customTool(
+                AnthropicTool(
                     description: "Call this function when the user wants a stock symbol",
                     inputSchema: [
                         "type": "object",
@@ -3328,143 +3782,181 @@ Use the file URL returned from the snippet above.
                     ],
                     name: "get_stock_symbol"
                 )
-            ]
-        )
+            )
+        ]
+    )
 
-        let stream = try await anthropicService.streamingMessageRequest(body: requestBody)
-        for try await chunk in stream {
-            switch chunk {
-            case .text(let text):
-                print(text)
-            case .toolUse(name: let toolName, input: let toolInput):
-                print("Claude wants to call tool \(toolName) with input \(toolInput)")
+    do {
+        let response = try await anthropicService.messageRequest(
+            body: requestBody,
+            secondsToWait: 120
+        )
+        for content in response.content {
+            switch content {
+            case .textBlock(let textBlock):
+                print("Received text from Claude: \(textBlock.text)")
+            case .toolUseBlock(let toolUseBlock):
+                print("Claude wants to call \(toolUseBlock.name) with input: \(toolUseBlock.input)")
+            default:
+                continue
             }
         }
-        print("Done with stream")
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print(error.localizedDescription)
+        print("Could not create an Anthropic message with tool calls: \(error)")
     }
 ```
 
+### How to make an Anthropic streaming message request with tool calls
 
-### How to send an image to Anthropic
+```swift
+    import AIProxy
+
+    /* Uncomment for BYOK use cases */
+    // let anthropicService = AIProxy.anthropicDirectService(
+    //     unprotectedAPIKey: "your-anthropic-key"
+    // )
+
+    /* Uncomment for all other production use cases */
+    // let anthropicService = AIProxy.anthropicService(
+    //     partialKey: "partial-key-from-your-developer-dashboard",
+    //     serviceURL: "service-url-from-your-developer-dashboard"
+    // )
+
+    let requestBody = AnthropicMessageRequestBody(
+        maxTokens: 8192,
+        messages: [
+            AnthropicMessageParam(
+                content: "What is Apple's stock symbol?",
+                role: .user
+            )
+        ],
+        model: "claude-haiku-4-5-20251001",
+        tools: [
+            .customTool(
+                AnthropicTool(
+                    description: "Call this function when the user wants a stock symbol",
+                    inputSchema: [
+                        "type": "object",
+                        "properties": [
+                            "ticker": [
+                                "type": "string",
+                                "description": "The stock ticker symbol, e.g. AAPL for Apple Inc."
+                            ]
+                        ],
+                        "required": ["ticker"]
+                    ],
+                    name: "get_stock_symbol"
+                )
+            )
+        ]
+    )
+
+    do {
+        let stream = try await anthropicService.streamingMessageRequest(
+            body: requestBody,
+            secondsToWait: 120
+        )
+        var toolCallAccumulator = AnthropicToolCallAccumulator()
+        for try await event in stream {
+            if let (toolName, toolInput) = try toolCallAccumulator.append(event) {
+                print("Claude wants to call tool \(toolName) with input \(toolInput)")
+            }
+
+            if case .contentBlockDelta(let contentBlockDelta) = event {
+                if case .textDelta(let textDelta) = contentBlockDelta.delta {
+                    print("Received a text delta from Anthropic: \(textDelta.text)")
+                }
+            }
+        }
+    } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
+        print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
+    } catch {
+        print("Could not create a streaming Anthropic message with tool calls: \(error)")
+    }
+```
+
+### How to make an Anthropic streaming message request with fine-grained tool streaming
+Fine-grained streaming can improve tool arrival time.
+For details, see https://platform.claude.com/docs/en/agents-and-tools/tool-use/fine-grained-tool-streaming
+
+Start with the snippet above, but set `maxTokens` to a large value (e.g. `65536`) and include the following header:
+
+```swift
+let stream = try await anthropicService.streamingMessageRequest(
+    body: requestBody,
+    secondsToWait: 120,
+    additionalHeaders: [
+        "anthropic-beta": "fine-grained-tool-streaming-2025-05-14"
+    ]
+)
+```
+
+### How to make an Anthropic message request with an image
 
 On macOS, use `NSImage(named:)` in place of `UIImage(named:)`
 
 ```swift
     import AIProxy
 
-    guard let image = UIImage(named: "myImage") else {
-        print("Could not find an image named 'myImage' in your app assets")
+    /* Uncomment for BYOK use cases */
+    // let anthropicService = AIProxy.anthropicDirectService(
+    //     unprotectedAPIKey: "your-anthropic-key"
+    // )
+
+    /* Uncomment for all other production use cases */
+    // let anthropicService = AIProxy.anthropicService(
+    //     partialKey: "partial-key-from-your-developer-dashboard",
+    //     serviceURL: "service-url-from-your-developer-dashboard"
+    // )
+
+    guard let image = NSImage(named: "my-image") else {
+        print("Could not find an image named 'my-image' in your app assets")
         return
     }
 
-    guard let jpegData = AIProxy.encodeImageAsJpeg(image: image, compressionQuality: 0.6) else {
+    guard let jpegData = AIProxy.encodeImageAsJpeg(image: image, compressionQuality: 0.8) else {
         print("Could not convert image to jpeg")
         return
     }
 
-    /* Uncomment for BYOK use cases */
-    // let anthropicService = AIProxy.anthropicDirectService(
-    //     unprotectedAPIKey: "your-anthropic-key"
-    // )
+    let imageBlockParam = AnthropicImageBlockParam(
+        source: .base64(data: jpegData.base64EncodedString(), mediaType: .jpeg),
+        cacheControl: nil
+    )
 
-    /* Uncomment for all other production use cases */
-    // let anthropicService = AIProxy.anthropicService(
-    //     partialKey: "partial-key-from-your-developer-dashboard",
-    //     serviceURL: "service-url-from-your-developer-dashboard"
-    // )
-
-    do {
-        let response = try await anthropicService.messageRequest(body: AnthropicMessageRequestBody(
-            maxTokens: 1024,
-            messages: [
-                AnthropicInputMessage(content: [
-                    .text("Provide a very short description of this image"),
-                    .image(mediaType: .jpeg, data: jpegData.base64EncodedString())
-                ], role: .user)
-            ],
-            model: "claude-3-5-sonnet-20240620"
-        ))
-        for content in response.content {
-            switch content {
-            case .text(let message):
-                print("Claude sent a message: \(message)")
-            case .toolUse(id: _, name: let toolName, input: let toolInput):
-                print("Claude used a tool \(toolName) with input: \(toolInput)")
-            }
-        }
-    } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
-        print("Received \(statusCode) status code with response body: \(responseBody)")
-    } catch {
-        print("Could not send a multi-modal message to Anthropic: \(error.localizedDescription)")
-    }
-```
-
-
-### How to use the tools API with Anthropic
-
-```swift
-    import AIProxy
-
-    /* Uncomment for BYOK use cases */
-    // let anthropicService = AIProxy.anthropicDirectService(
-    //     unprotectedAPIKey: "your-anthropic-key"
-    // )
-
-    /* Uncomment for all other production use cases */
-    // let anthropicService = AIProxy.anthropicService(
-    //     partialKey: "partial-key-from-your-developer-dashboard",
-    //     serviceURL: "service-url-from-your-developer-dashboard"
-    // )
+    let requestBody = AnthropicMessageRequestBody(
+        maxTokens: 8192,
+        messages: [
+            AnthropicMessageParam(
+                content: [
+                    .textBlock("Provide a very short description of this image"),
+                    .imageBlock(imageBlockParam),
+                ],
+                role: .user
+            )
+        ],
+        model: "claude-haiku-4-5-20251001",
+    )
 
     do {
-        let requestBody = AnthropicMessageRequestBody(
-            maxTokens: 1024,
-            messages: [
-                .init(
-                    content: [.text("What is nvidia's stock price?")],
-                    role: .user
-                )
-            ],
-            model: "claude-3-5-sonnet-20240620",
-            tools: [
-                .init(
-                    description: "Call this function when the user wants a stock symbol",
-                    inputSchema: [
-                        "type": "object",
-                        "properties": [
-                            "ticker": [
-                                "type": "string",
-                                "description": "The stock ticker symbol, e.g. AAPL for Apple Inc."
-                            ]
-                        ],
-                        "required": ["ticker"]
-                    ],
-                    name: "get_stock_symbol"
-                )
-            ]
+        let response = try await anthropicService.messageRequest(
+            body: requestBody,
+            secondsToWait: 120
         )
-        let response = try await anthropicService.messageRequest(body: requestBody)
-        for content in response.content {
-            switch content {
-            case .text(let message):
-                print("Claude sent a message: \(message)")
-            case .toolUse(id: _, name: let toolName, input: let toolInput):
-                print("Claude used a tool \(toolName) with input: \(toolInput)")
-            }
+        for case let .textBlock(textBlock) in response.content {
+            print("Received text from Claude: \(textBlock.text)")
         }
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
-        print("Received \(statusCode) status code with response body: \(responseBody)")
+        print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create Anthropic message with tool call: \(error.localizedDescription)")
+        print("Could not create an Anthropic message with image input: \(error)")
     }
 ```
 
 
-## How to use Anthropic's pdf support in a buffered chat completion
+### How to make an Anthropic message request with a PDF
 
 This snippet includes a pdf `mydocument.pdf` in the Anthropic request. Adjust the filename to
 match the pdf included in your Xcode project. The snippet expects the pdf in the app bundle.
@@ -3486,38 +3978,45 @@ match the pdf included in your Xcode project. The snippet expects the pdf in the
     guard let pdfFileURL = Bundle.main.url(forResource: "mydocument", withExtension: "pdf"),
           let pdfData = try? Data(contentsOf: pdfFileURL)
     else {
-        print("""
-              Drop mydocument.pdf file into your Xcode project first.
-              """)
+        print("Drop mydocument.pdf into your Xcode project first.")
         return
     }
 
+    let documentBlockParam = AnthropicDocumentBlockParam(
+        source: .base64PDF(AnthropicBase64PDFSource(data: pdfData.base64EncodedString()))
+    )
+
+    let requestBody = AnthropicMessageRequestBody(
+        maxTokens: 8192,
+        messages: [
+            AnthropicMessageParam(
+                content: [
+                    .textBlock("Provide a very short description of this pdf"),
+                    .documentBlock(documentBlockParam),
+                ],
+                role: .user
+            )
+        ],
+        model: "claude-haiku-4-5-20251001"
+    )
+
     do {
-        let response = try await anthropicService.messageRequest(body: AnthropicMessageRequestBody(
-            maxTokens: 1024,
-            messages: [
-                AnthropicInputMessage(content: [.pdf(data: pdfData.base64EncodedString())], role: .user),
-                AnthropicInputMessage(content: [.text("Summarize this")], role: .user)
-            ],
-            model: "claude-3-5-sonnet-20241022"
-        ))
-        for content in response.content {
-            switch content {
-            case .text(let message):
-                print("Claude sent a message: \(message)")
-            case .toolUse(id: _, name: let toolName, input: let toolInput):
-                print("Claude used a tool \(toolName) with input: \(toolInput)")
-            }
+        let response = try await anthropicService.messageRequest(
+            body: requestBody,
+            secondsToWait: 120
+        )
+        for case let .textBlock(textBlock) in response.content {
+            print("Received text from Claude: \(textBlock.text)")
         }
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not use Anthropic's buffered pdf support: \(error.localizedDescription)")
+        print("Could not create an Anthropic message with pdf input: \(error)")
     }
 ```
 
 
-## How to use Anthropic's pdf support in a streaming chat completion
+### How to make an Anthropic streaming message request with a PDF
 
 This snippet includes a pdf `mydocument.pdf` in the Anthropic request. Adjust the filename to
 match the pdf included in your Xcode project. The snippet expects the pdf in the app bundle.
@@ -3539,36 +4038,74 @@ match the pdf included in your Xcode project. The snippet expects the pdf in the
     guard let pdfFileURL = Bundle.main.url(forResource: "mydocument", withExtension: "pdf"),
           let pdfData = try? Data(contentsOf: pdfFileURL)
     else {
-        print("""
-              Drop mydocument.pdf file into your Xcode project first.
-              """)
+        print("Drop mydocument.pdf into your Xcode project first.")
         return
     }
 
+    let documentBlockParam = AnthropicDocumentBlockParam(
+        source: .base64PDF(AnthropicBase64PDFSource(data: pdfData.base64EncodedString()))
+    )
+
+    let requestBody = AnthropicMessageRequestBody(
+        maxTokens: 8192,
+        messages: [
+            AnthropicMessageParam(
+                content: [
+                    .textBlock("Provide a very short description of this pdf"),
+                    .documentBlock(documentBlockParam),
+                ],
+                role: .user
+            )
+        ],
+        model: "claude-haiku-4-5-20251001"
+    )
+
     do {
-        let stream = try await anthropicService.streamingMessageRequest(body: AnthropicMessageRequestBody(
-            maxTokens: 1024,
-            messages: [
-                AnthropicInputMessage(content: [.pdf(data: pdfData.base64EncodedString())], role: .user),
-                AnthropicInputMessage(content: [.text("Summarize this")], role: .user)
-            ],
-            model: "claude-3-5-sonnet-20241022"
-        ))
-        for try await chunk in stream {
-            switch chunk {
-            case .text(let text):
-                print(text)
-            case .toolUse(name: let toolName, input: let toolInput):
-                print("Claude wants to call tool \(toolName) with input \(toolInput)")
+        let stream = try await anthropicService.streamingMessageRequest(
+            body: requestBody,
+            secondsToWait: 120
+        )
+        for try await case .contentBlockDelta(let contentBlockDelta) in stream {
+            if case .textDelta(let textDelta) = contentBlockDelta.delta {
+                print("Received a text delta from Anthropic: \(textDelta.text)")
             }
         }
-        print("Done with stream")
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not use Anthropic's streaming pdf support: \(error.localizedDescription)")
+        print("Could not create a streaming Anthropic message with pdf input: \(error)")
     }
 ```
+
+### How to create an Anthropic request with a cached system prompt
+
+For pricing, see: https://platform.claude.com/docs/en/build-with-claude/prompt-caching#pricing 
+
+```swift
+    let requestBody = AnthropicMessageRequestBody(
+        maxTokens: 1024,
+        messages: [ /* snip */ ],
+        model: "claude-haiku-4-5-20251001",
+        system: .blocks([
+            AnthropicSystemTextBlockParam(
+                text: "This is a very long prompt",
+                cacheControl: AnthropicCacheControlEphemeral(ttl: .oneHour)
+            )
+        ])
+    )
+```
+
+### How to make requests to Anthropic on Azure
+
+1. Use the same snippets as above, but add the following to your `messageRequest` or `streamingMessageRequest` args:
+
+```swift
+additionalHeaders: [
+    "aiproxy-key-format": "x-api-key: {{key}}"
+]
+```
+
+2. In the AIProxy dashboard, configure your service to use the base URL of your Azure deployment *up to but not including* the `/v1/messages` path component.
 
 
 ***
@@ -3603,7 +4140,7 @@ For a SwiftUI example, see [this gist](https://gist.github.com/lzell/a878b787f24
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not generate an image with StabilityAI: \(error.localizedDescription)")
+        print("Could not generate an image with StabilityAI: \(error)")
     }
 ```
 
@@ -3634,7 +4171,7 @@ For a SwiftUI example, see [this gist](https://gist.github.com/lzell/a878b787f24
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create DeepL translation: \(error.localizedDescription)")
+        print("Could not create DeepL translation: \(error)")
     }
 
 ***
@@ -3669,7 +4206,7 @@ options to pass as the `model` argument:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create TogetherAI chat completion: \(error.localizedDescription)")
+        print("Could not create TogetherAI chat completion: \(error)")
     }
 
 
@@ -3703,7 +4240,7 @@ options to pass as the `model` argument:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create TogetherAI streaming chat completion: \(error.localizedDescription)")
+        print("Could not create TogetherAI streaming chat completion: \(error)")
     }
 
 
@@ -3771,7 +4308,7 @@ support JSON mode. See [this guide](https://docs.together.ai/docs/json-mode) for
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create TogetherAI JSON chat completion: \(error.localizedDescription)")
+        print("Could not create TogetherAI JSON chat completion: \(error)")
     }
 
 
@@ -3856,7 +4393,7 @@ This example is a Swift port of [this guide](https://docs.together.ai/docs/llama
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create TogetherAI llama 3.1 tool completion: \(error.localizedDescription)")
+        print("Could not create TogetherAI llama 3.1 tool completion: \(error)")
     }
 
 
@@ -3896,7 +4433,7 @@ This example is a Swift port of [this guide](https://docs.together.ai/docs/llama
         // You may want to catch additional Foundation errors and pop the appropriate UI
         // to the user. See "How to catch Foundation errors for specific conditions" here:
         // https://www.aiproxy.com/docs/integration-options.html
-        print("Could not create Flux-Schnell image: \(error.localizedDescription)")
+        print("Could not create Flux-Schnell image: \(error)")
     }
 ```
 
@@ -3936,7 +4473,7 @@ See the full range of controls for generating an image by viewing `ReplicateFlux
         // You may want to catch additional Foundation errors and pop the appropriate UI
         // to the user. See "How to catch Foundation errors for specific conditions" here:
         // https://www.aiproxy.com/docs/integration-options.html
-        print("Could not create Flux-Dev image: \(error.localizedDescription)")
+        print("Could not create Flux-Dev image: \(error)")
     }
 ```
 
@@ -3982,7 +4519,7 @@ following substitutions:
         // You may want to catch additional Foundation errors and pop the appropriate UI
         // to the user. See "How to catch Foundation errors for specific conditions" here:
         // https://www.aiproxy.com/docs/integration-options.html
-        print("Could not create Flux-Pro 1.1 image: \(error.localizedDescription)")
+        print("Could not create Flux-Pro 1.1 image: \(error)")
     }
 ```
 
@@ -4038,7 +4575,7 @@ On macOS, use `NSImage(named:)` in place of `UIImage(named:)`
         // You may want to catch additional Foundation errors and pop the appropriate UI
         // to the user. See "How to catch Foundation errors for specific conditions" here:
         // https://www.aiproxy.com/docs/integration-options.html
-        print("Could not create Flux-Pulid images: \(error.localizedDescription)")
+        print("Could not create Flux-Pulid images: \(error)")
     }
 ```
 
@@ -4082,7 +4619,7 @@ There are many controls to play with for this use case. Please see
         // You may want to catch additional Foundation errors and pop the appropriate UI
         // to the user. See "How to catch Foundation errors for specific conditions" here:
         // https://www.aiproxy.com/docs/integration-options.html
-        print("Could not create Flux-ControlNet image: \(error.localizedDescription)")
+        print("Could not create Flux-ControlNet image: \(error)")
     }
 ```
 
@@ -4118,7 +4655,7 @@ There are many controls to play with for this use case. Please see
         // You may want to catch additional Foundation errors and pop the appropriate UI
         // to the user. See "How to catch Foundation errors for specific conditions" here:
         // https://www.aiproxy.com/docs/integration-options.html
-        print("Could not create SDXL image: \(error.localizedDescription)")
+        print("Could not create SDXL image: \(error)")
     }
 ```
 
@@ -4157,7 +4694,7 @@ See the full range of controls for generating an image by viewing `ReplicateSDXL
         // You may want to catch additional Foundation errors and pop the appropriate UI
         // to the user. See "How to catch Foundation errors for specific conditions" here:
         // https://www.aiproxy.com/docs/integration-options.html
-        print("Could not create SDXL Fresh Ink images: \(error.localizedDescription)")
+        print("Could not create SDXL Fresh Ink images: \(error)")
     }
 ```
 
@@ -4204,7 +4741,7 @@ Add a file called 'my-image.jpg' to Xcode app assets. Then run this snippet:
         // You may want to catch additional Foundation errors and pop the appropriate UI
         // to the user. See "How to catch Foundation errors for specific conditions" here:
         // https://www.aiproxy.com/docs/integration-options.html
-        print("Could not use deepseek vision on replicate: \(error.localizedDescription)")
+        print("Could not use deepseek vision on replicate: \(error)")
     }
 ```
 
@@ -4267,7 +4804,7 @@ snippet:
         // You may want to catch additional Foundation errors and pop the appropriate UI
         // to the user. See "How to catch Foundation errors for specific conditions" here:
         // https://www.aiproxy.com/docs/integration-options.html
-        print("Could not run replicate model: \(error.localizedDescription)")
+        print("Could not run replicate model: \(error)")
     }
 ```
 
@@ -4314,7 +4851,7 @@ snippet:
         // You may want to catch additional Foundation errors and pop the appropriate UI
         // to the user. See "How to catch Foundation errors for specific conditions" here:
         // https://www.aiproxy.com/docs/integration-options.html
-        print("Could not upload file to replicate: \(error.localizedDescription)")
+        print("Could not upload file to replicate: \(error)")
     }
 ```
 
@@ -4348,7 +4885,7 @@ Replace `<your-account>`:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create replicate model: \(error.localizedDescription)")
+        print("Could not create replicate model: \(error)")
     }
 ```
 
@@ -4394,7 +4931,7 @@ for tips on what to include in the zip file. Then run:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not upload file to replicate: \(error.localizedDescription)")
+        print("Could not upload file to replicate: \(error)")
     }
 ```
 
@@ -4444,7 +4981,7 @@ Use the `<model-name>` that you used from the snippet above that.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create replicate training: \(error.localizedDescription)")
+        print("Could not create replicate training: \(error)")
     }
 ```
 
@@ -4482,7 +5019,7 @@ Use the `<url>` that is returned from the snippet above.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not poll for the replicate training: \(error.localizedDescription)")
+        print("Could not poll for the replicate training: \(error)")
     }
 ```
 
@@ -4527,7 +5064,7 @@ model owner and model name in the string.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create replicate prediction: \(error.localizedDescription)")
+        print("Could not create replicate prediction: \(error)")
     }
 ```
 
@@ -4570,7 +5107,7 @@ model owner and model name in the string.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create Flux Kontext Max image: \(error.localizedDescription)")
+        print("Could not create Flux Kontext Max image: \(error)")
     }
 ```
 
@@ -4613,7 +5150,7 @@ model owner and model name in the string.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create Flux Kontext Pro image: \(error.localizedDescription)")
+        print("Could not create Flux Kontext Pro image: \(error)")
     }
 ```
 
@@ -4661,13 +5198,90 @@ model owner and model name in the string.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print("Could not create ElevenLabs TTS audio: \(error.localizedDescription)")
+        print("Could not create ElevenLabs TTS audio: \(error)")
     }
 ```
 
 - See the full range of TTS controls by viewing `ElevenLabsTTSRequestBody.swift`.
 - See https://api.elevenlabs.io/v1/voices for the IDs that you can pass to `voiceID`.
+- To get timing information of the spoken text, use `elevenLabsService.ttsRequestWithTimestamps`:
 
+```swift
+let res = try await elevenLabsService.ttsRequestWithTimestamps(
+    voiceID: "EXAVITQu4vr4xnSDxMaL",
+    body: body,
+    secondsToWait: 120
+)
+// Timing information is available as `res.alignment` and `res.normalizedAlignment`
+// Audio to pass to the AVAudioPlayer is available as `res.audioData`
+```
+
+### How to use ElevenLabs for streaming text-to-speech
+
+```swift
+    import AIProxy
+
+    /* Uncomment for BYOK use cases */
+    // let elevenLabsService = AIProxy.elevenLabsDirectService(
+    //     unprotectedAPIKey: "your-elevenLabs-key"
+    // )
+
+    /* Uncomment for all other production use cases */
+    // let elevenLabsService = AIProxy.elevenLabsService(
+    //     partialKey: "partial-key-from-your-developer-dashboard",
+    //     serviceURL: "service-url-from-your-developer-dashboard"
+    // )
+
+    let body = ElevenLabsTTSRequestBody(text: "Hello world")
+
+    do {
+        // Do not use a local `let` or `var` for AudioController.
+        // You need the lifecycle of the player to live beyond the scope of this function.
+        //
+        // Use file scope or set the player as a member of a reference type with long life.
+        // For example, at the top of this file you may define:
+        //
+        //   fileprivate var audioController: AudioController? = nil
+        //
+        // and then use the code below to stream the TTS result.
+        //
+        // For an improved user experience, try to opportunistically create the AudioController
+        // before the user needs it (for example, when the user starts a flow that may use audio).
+        // That way the player is warmed by the time ElevenLabs streams the first bit of audio for playback.
+        audioController = try await AudioController(modes: [.playback])
+
+        let stream = try await elevenLabsService.streamingTTSRequest(
+            voiceID: "EXAVITQu4vr4xnSDxMaL",
+            body: body,
+            secondsToWait: 60
+        )
+
+        for await chunk in stream {
+            await audioController?.playPCM16Audio(data: chunk)
+        }
+    } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
+        print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
+    } catch {
+        print("Could not create ElevenLabs TTS streaming audio: \(error)")
+    }
+```
+
+- See the full range of TTS controls by viewing `ElevenLabsTTSRequestBody.swift`.
+- See https://api.elevenlabs.io/v1/voices for the IDs that you can pass to `voiceID`.
+- To get timing information of the spoken text, use `elevenLabsService.streamingTTSWithTimestampsRequest`:
+
+```swift
+let stream = try await elevenLabsService.streamingTTSWithTimestampsRequest(
+    voiceID: "EXAVITQu4vr4xnSDxMaL",
+    body: body,
+    secondsToWait: 120
+)
+
+for try await chunk in stream {
+    // Timing information is available as `chunk.alignment` and `chunk.normalizedAlignment`
+    // Audio to pass to the AVAudioPlayer is available as `chunk.audioData`
+}
+```
 
 ### How to use ElevenLabs for speech-to-speech
 
@@ -4719,7 +5333,7 @@ model owner and model name in the string.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create ElevenLabs STS audio: \(error.localizedDescription)")
+        print("Could not create ElevenLabs STS audio: \(error)")
     }
 ```
 
@@ -4761,7 +5375,7 @@ model owner and model name in the string.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create ElevenLabs STT audio: \(error.localizedDescription)")
+        print("Could not create ElevenLabs STT audio: \(error)")
     }
 ```
 
@@ -4799,7 +5413,7 @@ model owner and model name in the string.
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create Fal SDXL image: \(error.localizedDescription)")
+        print("Could not create Fal SDXL image: \(error)")
     }
 ```
 
@@ -4852,7 +5466,7 @@ The `garmentImage` and `modelImage` arguments may be:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create fashn/tryon image on Fal: \(error.localizedDescription)")
+        print("Could not create fashn/tryon image on Fal: \(error)")
     }
     ```
 
@@ -4893,7 +5507,7 @@ I do here), or construct the zip in memory:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not upload file to Fal: \(error.localizedDescription)")
+        print("Could not upload file to Fal: \(error)")
     }
 ```
 
@@ -4915,7 +5529,7 @@ Using the URL returned in the step above:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create Fal Flux training: \(error.localizedDescription)")
+        print("Could not create Fal Flux training: \(error)")
     }
 ```
 
@@ -4946,7 +5560,7 @@ Using the LoRA URL returned in the step above:
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create Fal LoRA image: \(error.localizedDescription)")
+        print("Could not create Fal LoRA image: \(error)")
     }
 ```
 
@@ -4997,7 +5611,43 @@ See `FalFluxLoRAInputSchema.swift` for the full range of inference controls
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create Flux Kontext Pro image: \(error.localizedDescription)")
+        print("Could not create Flux Kontext Pro image: \(error)")
+    }
+```
+
+#### How to generate an image using Flux 2
+
+```swift
+    import AIProxy
+
+    /* Uncomment for BYOK use cases */
+    // let falService = AIProxy.falDirectService(
+    //     unprotectedAPIKey: "your-fal-key"
+    // )
+
+    /* Uncomment for all other production use cases */
+    // let falService = AIProxy.falService(
+    //     partialKey: "partial-key-from-your-developer-dashboard",
+    //     serviceURL: "service-url-from-your-developer-dashboard"
+    // )
+
+    let input = FalFlux2InputSchema(
+        prompt: "Yosemite Valley",
+        enableSafetyChecker: false
+    )
+    do {
+        let output = try await falService.createFlux2Image(
+            input: input,
+            secondsToWait: 120
+        )
+        print("""
+              The first output image is at \(output.images?.first?.url?.absoluteString ?? "")
+              It took \(output.timings?.inference ?? Double.nan) seconds to generate.
+              """)
+    } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
+        print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
+    } catch {
+        print("Could not create Fal Flux 2 image: \(error)")
     }
 ```
 
@@ -5032,7 +5682,7 @@ See `FalFluxLoRAInputSchema.swift` for the full range of inference controls
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print(error.localizedDescription)
+        print(error)
     }
 ```
 
@@ -5065,7 +5715,7 @@ See `FalFluxLoRAInputSchema.swift` for the full range of inference controls
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received \(statusCode) status code with response body: \(responseBody)")
     } catch {
-        print(error.localizedDescription)
+        print(error)
     }
 ```
 
@@ -5103,7 +5753,7 @@ See `FalFluxLoRAInputSchema.swift` for the full range of inference controls
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not get audio transcription from Groq: \(error.localizedDescription)")
+        print("Could not get audio transcription from Groq: \(error)")
     }
 ```
 
@@ -5151,7 +5801,7 @@ See `FalFluxLoRAInputSchema.swift` for the full range of inference controls
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create perplexity chat completion: \(error.localizedDescription)")
+        print("Could not create perplexity chat completion: \(error)")
     }
 ```
 
@@ -5199,7 +5849,7 @@ See `FalFluxLoRAInputSchema.swift` for the full range of inference controls
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create perplexity streaming chat completion: \(error.localizedDescription)")
+        print("Could not create perplexity streaming chat completion: \(error)")
     }
 ```
 
@@ -5248,7 +5898,7 @@ Use `api.mistral.ai` as the proxy domain when creating your AIProxy service in t
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create mistral chat completion: \(error.localizedDescription)")
+        print("Could not create mistral chat completion: \(error)")
     }
 ```
 
@@ -5296,7 +5946,7 @@ Use `api.mistral.ai` as the proxy domain when creating your AIProxy service in t
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not create mistral streaming chat completion: \(error.localizedDescription)")
+        print("Could not create mistral streaming chat completion: \(error)")
     }
 ```
 
@@ -5341,7 +5991,7 @@ Use `api.mistral.ai` as the proxy domain when creating your AIProxy service in t
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not perform OCR request with Mistral: \(error.localizedDescription)")
+        print("Could not perform OCR request with Mistral: \(error)")
     }
 ```
 
@@ -5388,7 +6038,7 @@ Use `flows.eachlabs.ai` as the proxy domain when creating your AIProxy service i
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not execute EachAI workflow: \(error.localizedDescription)")
+        print("Could not execute EachAI workflow: \(error)")
     }
 ```
 
@@ -5420,7 +6070,7 @@ Use `flows.eachlabs.ai` as the proxy domain when creating your AIProxy service i
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not run Imagen 4 on EachAI: \(error.localizedDescription)")
+        print("Could not run Imagen 4 on EachAI: \(error)")
     }
 ```
 
@@ -5480,7 +6130,7 @@ This way you ensure that your EachAI + AIProxy integration is working correctly 
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not run Veo3 on EachAI: \(error.localizedDescription)")
+        print("Could not run Veo3 on EachAI: \(error)")
     }
 ```
 
@@ -5549,7 +6199,7 @@ This way you ensure that your EachAI + AIProxy integration is working correctly 
     } catch let err as URLError where [.notConnectedToInternet, .networkConnectionLost].contains(err.code) {
         print("Could not make OpenRouter streaming R1 chat request. Please check your internet connection")
     } catch {
-        print("Could not get OpenRouter streaming R1 chat completion: \(error.localizedDescription)")
+        print("Could not get OpenRouter streaming R1 chat completion: \(error)")
     }
 ```
 
@@ -5629,7 +6279,7 @@ And then use the corresponding enum from this list: https://openrouter.ai/docs/f
     } catch let err as URLError where [.notConnectedToInternet, .networkConnectionLost].contains(err.code) {
         print("Could not make OpenRouter buffered R1 chat request. Please check your internet connection")
     } catch {
-        print("Could not get OpenRouter buffered R1 chat completion: \(error.localizedDescription)")
+        print("Could not get OpenRouter buffered R1 chat completion: \(error)")
     }
 ```
 
@@ -5696,7 +6346,7 @@ And then use the corresponding enum from this list: https://openrouter.ai/docs/f
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not get OpenRouter buffered chat completion: \(error.localizedDescription)")
+        print("Could not get OpenRouter buffered chat completion: \(error)")
     }
 ```
 
@@ -5747,7 +6397,7 @@ And then use the corresponding enum from this list: https://openrouter.ai/docs/f
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not get OpenRouter streaming chat completion: \(error.localizedDescription)")
+        print("Could not get OpenRouter streaming chat completion: \(error)")
     }
 ```
 
@@ -5812,7 +6462,7 @@ And then use the corresponding enum from this list: https://openrouter.ai/docs/f
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not get OpenRouter streaming tool call: \(error.localizedDescription)")
+        print("Could not get OpenRouter streaming tool call: \(error)")
     }
 }
 
@@ -5899,7 +6549,7 @@ And then use the corresponding enum from this list: https://openrouter.ai/docs/f
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not get structured outputs response from OpenRouter: \(error.localizedDescription)")
+        print("Could not get structured outputs response from OpenRouter: \(error)")
     }
 ```
 
@@ -5970,7 +6620,7 @@ On macOS, use `NSImage(named:)` in place of `UIImage(named:)`
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not make a vision request to OpenRouter: \(error.localizedDescription)")
+        print("Could not make a vision request to OpenRouter: \(error)")
     }
 ```
 
@@ -6044,7 +6694,7 @@ On macOS, use `NSImage(named:)` in place of `UIImage(named:)`
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not get first chat completion: \(error.localizedDescription)")
+        print("Could not get first chat completion: \(error)")
     }
 ```
 
@@ -6096,7 +6746,7 @@ On macOS, use `NSImage(named:)` in place of `UIImage(named:)`
     } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
         print("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
     } catch {
-        print("Could not get DeepSeek buffered chat completion: \(error.localizedDescription)")
+        print("Could not get DeepSeek buffered chat completion: \(error)")
     }
 ```
 
@@ -6156,7 +6806,7 @@ On macOS, use `NSImage(named:)` in place of `UIImage(named:)`
     } catch let err as URLError where [.notConnectedToInternet, .networkConnectionLost].contains(err.code) {
         print("Could not make buffered chat request. Please check your internet connection")
     } catch {
-        print("Could not get DeepSeek buffered chat completion: \(error.localizedDescription)")
+        print("Could not get DeepSeek buffered chat completion: \(error)")
     }
 ```
 
@@ -6265,7 +6915,7 @@ On macOS, use `NSImage(named:)` in place of `UIImage(named:)`
     } catch let err as URLError where [.notConnectedToInternet, .networkConnectionLost].contains(err.code) {
         print("Could not make DeepSeek R1 streaming chat request. Please check your internet connection")
     } catch {
-        print("Could not get DeepSeek R1 streaming chat completion: \(error.localizedDescription)")
+        print("Could not get DeepSeek R1 streaming chat completion: \(error)")
     }
 ```
 
@@ -6328,7 +6978,7 @@ not on the messages's `reasoningContent` property. Instead, the reasoning conten
     } catch let err as URLError where [.notConnectedToInternet, .networkConnectionLost].contains(err.code) {
         print("Could not complete R1 request to FireworksAI. Please check your internet connection")
     } catch {
-        print("Could not complete R1 request to FireworksAI: \(error.localizedDescription)")
+        print("Could not complete R1 request to FireworksAI: \(error)")
     }
 ```
 
@@ -6383,7 +7033,7 @@ not on the messages's `reasoningContent` property. Instead, the reasoning conten
     } catch let err as URLError where [.notConnectedToInternet, .networkConnectionLost].contains(err.code) {
         print("Could not complete R1 request to FireworksAI. Please check your internet connection")
     } catch {
-        print("Could not complete R1 request to FireworksAI: \(error.localizedDescription)")
+        print("Could not complete R1 request to FireworksAI: \(error)")
     }
 ```
 
@@ -6424,7 +7074,7 @@ proxy base URL.
         // You may want to catch additional Foundation errors and pop the appropriate UI
         // to the user. See "How to catch Foundation errors for specific conditions" here:
         // https://www.aiproxy.com/docs/integration-options.html
-        print("Could not make brave search: \(error.localizedDescription)")
+        print("Could not make brave search: \(error)")
     }
 ```
 
@@ -6465,7 +7115,7 @@ into the OpenMeteoSDK:
         // 4. Scroll to 'Usage'
         print(responses)
     } catch {
-        print("Could not fetch the weather: \(error.localizedDescription)")
+        print("Could not fetch the weather: \(error)")
     }
 ```
 
@@ -6522,7 +7172,7 @@ In such a case, you can pop UI to the end user by catching AIProxyError.deviceCh
         //     Please make sure you are connected to the internet and your system clock is accurately set.
         //
     } catch {
-        print("Could not create an OpenAI chat completion: \(error.localizedDescription)")
+        print("Could not create an OpenAI chat completion: \(error)")
     }
 ```
 
@@ -6558,7 +7208,7 @@ your user. For example, to catch `NSURLErrorTimedOut`, `NSURLErrorNetworkConnect
     } catch let err as URLError where [.notConnectedToInternet, .networkConnectionLost].contains(err.code) {
         print("Could not make buffered chat request. Please check your internet connection")
     } catch {
-        print("Could not get buffered chat completion: \(error.localizedDescription)")
+        print("Could not get buffered chat completion: \(error)")
     }
 ```
 
@@ -6694,7 +7344,9 @@ Contributions are welcome! This library uses the MIT license.
 
 - In codable representations, fields that are required by the API should be above fields that
   are optional. Within the two groups (required and optional) all fields should be
-  alphabetically ordered. Separate the two groups with a mark to aid users of ctrl-6:
+  in the provider's documentation order. This makes it easier for contributors and LLMs
+  to spot differences between the provider documentation and our encodable/decodable fields.
+  Separate the two groups with a mark to aid users of ctrl-6:
 
   ```swift
   // MARK: Optional properties
@@ -6715,7 +7367,7 @@ Contributions are welcome! This library uses the MIT license.
   in the same namespace as the top level struct. For examples:
 
     ```swift
-    public struct ProviderResponseBody: Decodable {
+    public struct ProviderResponseBody: Decodable, Sendable {
 
         public let status: Status?
 
@@ -6724,7 +7376,7 @@ Contributions are welcome! This library uses the MIT license.
 
     // MARK: -
     extension ProviderResponseBody {
-        public enum Status: String, Decodable {
+        public enum Status: String, Decodable, Sendable {
             case succeeded
             case failed
             case canceled
@@ -6738,8 +7390,8 @@ Contributions are welcome! This library uses the MIT license.
   You may wonder why we don't nest all types within the original top level type definition:
 
   ```swift
-  public struct ProviderResponseBody: Decodable {
-      public enum Status: String, Decodable {
+  public struct ProviderResponseBody: Decodable, Sendable {
+      public enum Status: String, Decodable, Sendable {
           ...
       }
   }
@@ -6760,7 +7412,7 @@ Contributions are welcome! This library uses the MIT license.
 
     ```swift
     // ProviderResponseBody.swift
-    public struct ProviderResponseBody: Decodable {
+    public struct ProviderResponseBody: Decodable, Sendable {
 
         // An examples status
         public let status: ProviderStatus?
@@ -6769,7 +7421,7 @@ Contributions are welcome! This library uses the MIT license.
     }
 
     // ProviderStatus.swift
-    public enum ProviderStatus: String, Decodable {
+    public enum ProviderStatus: String, Decodable, Sendable {
         case succeeded
         case failed
         case canceled
@@ -6833,7 +7485,7 @@ built-in service, take the following steps to add a custom service to your app:
     You would define a response body that looks like this:
 
     ```swift
-        struct ChatResponseBody: Decodable {
+        struct ChatResponseBody: Decodable, Sendable {
             let generatedMessage: String?
 
             enum CodingKeys: String, CodingKey {

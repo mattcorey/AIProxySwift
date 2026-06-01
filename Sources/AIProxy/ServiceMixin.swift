@@ -7,27 +7,35 @@
 
 import Foundation
 
-protocol ServiceMixin {
+@AIProxyActor protocol ServiceMixin: Sendable {
     var urlSession: URLSession { get }
 }
 
 extension ServiceMixin {
-    func makeRequestAndDeserializeResponse<T: Decodable>(_ request: URLRequest) async throws -> T {
-        if AIProxyConfiguration.printRequestBodies {
+    @AIProxyActor func makeRequestAndDeserializeResponse<T: Decodable & Sendable>(_ request: URLRequest) async throws -> T {
+        let response: AIProxyResponseWithHeaders<T> = try await self.makeRequestAndDeserializeResponseWithMetadata(request)
+        return response.body
+    }
+
+    @AIProxyActor func makeRequestAndDeserializeResponseWithMetadata<T: Decodable & Sendable>(_ request: URLRequest) async throws -> AIProxyResponseWithHeaders<T> {
+        if AIProxy.printRequestBodies {
             printRequestBody(request)
         }
-        let (data, _) = try await BackgroundNetworker.makeRequestAndWaitForData(
+        let (data, httpResponse) = try await BackgroundNetworker.makeRequestAndWaitForData(
             self.urlSession,
             request
         )
-        if AIProxyConfiguration.printResponseBodies {
+        if AIProxy.printResponseBodies {
             printBufferedResponseBody(data)
         }
-        return try T.deserialize(from: data)
+        return AIProxyResponseWithHeaders(
+            body: try T.deserialize(from: data),
+            headers: httpResponse.readableHeaders
+        )
     }
 
-    func makeRequestAndDeserializeStreamingChunks<T: Decodable>(_ request: URLRequest) async throws -> AsyncThrowingStream<T, Error> {
-        if AIProxyConfiguration.printRequestBodies {
+    @AIProxyActor func makeRequestAndDeserializeStreamingChunks<T: Decodable & Sendable>(_ request: URLRequest) async throws -> AsyncThrowingStream<T, Error> {
+        if AIProxy.printRequestBodies {
             printRequestBody(request)
         }
 
@@ -36,8 +44,8 @@ extension ServiceMixin {
             request
         )
 
-        let sequence = asyncBytes.lines.compactMap { (line: String) -> T? in
-            if AIProxyConfiguration.printResponseBodies {
+        let sequence = asyncBytes.lines.compactMap { @AIProxyActor [shouldPrint = AIProxy.printResponseBodies] (line: String) -> T? in
+            if shouldPrint {
                 printStreamingResponseChunk(line)
             }
             return T.deserialize(fromLine: line)
@@ -47,7 +55,7 @@ extension ServiceMixin {
         // something like: AsyncCompactMapSequence<AsyncLineSequence<URLSession.AsyncBytes>, OpenAIChatCompletionChunk>
         //
         // So instead I manually map it to an AsyncStream with a nice signature of AsyncThrowingStream<OpenAIChatCompletionChunk, Error>.
-        return AsyncThrowingStream { continuation in
+        return AsyncThrowingStream { @AIProxyActor continuation in
             let task = Task {
                 do {
                     for try await item in sequence {
@@ -66,14 +74,71 @@ extension ServiceMixin {
             }
         }
     }
+
+    /// Deserializes streaming NDJSON (newline-delimited JSON) chunks.
+    /// Unlike `makeRequestAndDeserializeStreamingChunks`, this method does not expect
+    /// SSE-style "data: " prefixes. Each line is treated as raw JSON.
+    @AIProxyActor func makeRequestAndDeserializeNDJSONChunks<T: Decodable & Sendable>(_ request: URLRequest) async throws -> AsyncThrowingStream<T, Error> {
+        let response: AIProxyChunkStreamResponse<T> = try await self.makeRequestAndDeserializeNDJSONChunksWithMetadata(request)
+        return response.stream
+    }
+
+    @AIProxyActor func makeRequestAndDeserializeNDJSONChunksWithMetadata<T: Decodable & Sendable>(_ request: URLRequest) async throws -> AIProxyChunkStreamResponse<T> {
+        if AIProxy.printRequestBodies {
+            printRequestBody(request)
+        }
+
+        let (asyncBytes, httpResponse) = try await BackgroundNetworker.makeRequestAndWaitForAsyncBytes(
+            self.urlSession,
+            request
+        )
+
+        let stream = AsyncThrowingStream<T, Error> { @AIProxyActor continuation in
+            let task = Task {
+                do {
+                    for try await line in asyncBytes.lines {
+                        if Task.isCancelled {
+                            break
+                        }
+                        if AIProxy.printResponseBodies {
+                            printStreamingResponseChunk(line)
+                        }
+                        guard !line.isEmpty else { continue }
+                        guard let data = line.data(using: .utf8) else { continue }
+                        do {
+                            let deserialized = try T.deserialize(from: data)
+                            continuation.yield(deserialized)
+                        } catch {
+                            logIf(.warning)?.warning(
+                                """
+                                AIProxy: Could not deserialize \(T.self) from NDJSON line: \(line)
+                                Decodable error: \(error)
+                                """
+                            )
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+        return AIProxyChunkStreamResponse(
+            headers: httpResponse.readableHeaders,
+            stream: stream
+        )
+    }
 }
 
 private extension URLRequest {
-    var readableURL: String {
+    nonisolated var readableURL: String {
         return self.url?.absoluteString ?? ""
     }
 
-    var readableBody: String {
+    nonisolated var readableBody: String {
         guard let body = self.httpBody else {
             return "None"
         }
@@ -82,7 +147,7 @@ private extension URLRequest {
     }
 }
 
-private func printRequestBody(_ request: URLRequest) {
+nonisolated private func printRequestBody(_ request: URLRequest) {
     logIf(.debug)?.debug(
         """
         Making a request to \(request.readableURL)
@@ -92,7 +157,7 @@ private func printRequestBody(_ request: URLRequest) {
     )
 }
 
-private func printBufferedResponseBody(_ data: Data) {
+nonisolated private func printBufferedResponseBody(_ data: Data) {
     logIf(.debug)?.debug(
         """
         Received response body:
@@ -101,11 +166,21 @@ private func printBufferedResponseBody(_ data: Data) {
     )
 }
 
-private func printStreamingResponseChunk(_ chunk: String) {
+nonisolated private func printStreamingResponseChunk(_ chunk: String) {
     logIf(.debug)?.debug(
         """
         Received streaming response chunk:
         \(chunk)
         """
     )
+}
+
+extension HTTPURLResponse {
+    var readableHeaders: [String: String] {
+        var headers: [String: String] = [:]
+        for (key, value) in self.allHeaderFields {
+            headers[String(describing: key)] = String(describing: value)
+        }
+        return headers
+    }
 }
