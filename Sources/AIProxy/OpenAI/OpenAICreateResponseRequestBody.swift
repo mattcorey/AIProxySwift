@@ -205,9 +205,6 @@ extension OpenAICreateResponseRequestBody {
     @available(*, deprecated, renamed: "ContextManagementItem")
     public typealias ContextManagement = ContextManagementItem
 
-    /// Legacy nested name retained for callers that used sdkVersion <= 0.121.0.
-    public typealias Include = OpenAIInclude
-
     /// The truncation strategy to use for the model response.
     nonisolated public enum Truncation: String, Encodable, Sendable {
         /// If the input to this response exceeds the model's context window size, the model will truncate the response to fit the context window by dropping items from the beginning of the conversation.
