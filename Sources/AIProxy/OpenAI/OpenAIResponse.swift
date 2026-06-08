@@ -408,9 +408,77 @@ extension OpenAIResponse {
             public let sources: [WebSearchSource]?
         }
 
-        nonisolated public struct WebSearchSource: Decodable, Sendable {
-            public let type: String
-            public let url: String
+        nonisolated public enum WebSearchSource: Decodable, Sendable {
+            case url(URLSource)
+            case api(APISource)
+            case unknown(UnknownSource)
+
+            private enum CodingKeys: String, CodingKey {
+                case name
+                case type
+                case url
+            }
+
+            public var type: String {
+                switch self {
+                case .url(let source):
+                    source.type
+                case .api(let source):
+                    source.type
+                case .unknown(let source):
+                    source.type
+                }
+            }
+
+            public var url: String? {
+                if case .url(let source) = self {
+                    return source.url
+                }
+                return nil
+            }
+
+            public var name: String? {
+                if case .api(let source) = self {
+                    return source.name
+                }
+                return nil
+            }
+
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                let type = try container.decodeIfPresent(String.self, forKey: .type) ?? "unknown"
+
+                switch type {
+                case "url":
+                    if let url = try container.decodeIfPresent(String.self, forKey: .url) {
+                        self = .url(URLSource(url: url))
+                    } else {
+                        self = .unknown(UnknownSource(type: type))
+                    }
+                case "api":
+                    if let name = try container.decodeIfPresent(String.self, forKey: .name) {
+                        self = .api(APISource(name: name))
+                    } else {
+                        self = .unknown(UnknownSource(type: type))
+                    }
+                default:
+                    self = .unknown(UnknownSource(type: type))
+                }
+            }
+
+            nonisolated public struct URLSource: Sendable {
+                public let type = "url"
+                public let url: String
+            }
+
+            nonisolated public struct APISource: Sendable {
+                public let type = "api"
+                public let name: String
+            }
+
+            nonisolated public struct UnknownSource: Sendable {
+                public let type: String
+            }
         }
     }
 

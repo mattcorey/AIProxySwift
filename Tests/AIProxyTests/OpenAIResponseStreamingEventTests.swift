@@ -130,10 +130,47 @@ class OpenAIResponseStreamingEventTests: XCTestCase {
         let firstSource = webSearchCall.action?.sources?.first
         XCTAssertEqual(firstSource?.type, "url")
         XCTAssertEqual(firstSource?.url, "https://www.wsj.com/sports/football/bills-ravens-josh-allen-lamar-jackson-derrick-henry-f8fc4d38")
+        XCTAssertNil(firstSource?.name)
 
         let lastSource = webSearchCall.action?.sources?.last
         XCTAssertEqual(lastSource?.type, "url")
         XCTAssertEqual(lastSource?.url, "https://www.capstone-companies.com/summary/bills-game-today")
+    }
+
+    func testWebSearchCallWithAPISourceIsDecodable() throws {
+        let line = #"data: {"type":"response.output_item.done","sequence_number":8,"output_index":1,"item":{"id":"ws_sports","type":"web_search_call","status":"completed","action":{"type":"search","query":"sports: {\"fn\":\"schedule\",\"league\":\"mlb\",\"team\":\"NYM\"}","sources":[{"type":"api","name":"oai-sports"}]}}}"#
+        let event = OpenAIResponseStreamingEvent.deserialize(fromLine: line)
+
+        guard case .outputItemDone(let outputItemDone) = event else {
+            return XCTFail("Expected response.output_item.done")
+        }
+
+        guard case .webSearchCall(let webSearchCall) = outputItemDone.item else {
+            return XCTFail("Expected web search call")
+        }
+
+        let source = webSearchCall.action?.sources?.first
+        XCTAssertEqual(source?.type, "api")
+        XCTAssertEqual(source?.name, "oai-sports")
+        XCTAssertNil(source?.url)
+    }
+
+    func testCompletedResponseWithAPISourceIsDecodable() throws {
+        let line = #"data: {"type":"response.completed","sequence_number":36,"response":{"id":"resp_123","object":"response","created_at":1780683995,"status":"completed","background":false,"error":null,"incomplete_details":null,"instructions":null,"max_output_tokens":null,"max_tool_calls":null,"model":"gpt-5.4-mini-2026-03-17","output":[{"id":"ws_sports","type":"web_search_call","status":"completed","action":{"type":"search","query":"sports: {\"fn\":\"schedule\",\"league\":\"mlb\",\"team\":\"NYM\"}","sources":[{"type":"api","name":"oai-sports"}]}},{"id":"msg_123","type":"message","status":"completed","content":[{"type":"output_text","annotations":[],"logprobs":[],"text":"{\"aaReply\":\"The Mets play today.\",\"keyPhrasesAndIdeas\":null,\"newMemories\":null,\"questions\":null,\"removeMemories\":null,\"title\":\"Mets Today\"}"}],"role":"assistant"}],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"service_tier":"default","store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[{"type":"web_search","search_context_size":"low"}],"top_logprobs":0,"top_p":1.0,"truncation":"disabled","usage":{"input_tokens":1,"input_tokens_details":{"cached_tokens":0},"output_tokens":1,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":2},"user":null,"metadata":{}}}"#
+        let event = OpenAIResponseStreamingEvent.deserialize(fromLine: line)
+
+        guard case .responseCompleted(let responseCompleted) = event else {
+            return XCTFail("Expected response.completed")
+        }
+
+        guard case .webSearchCall(let webSearchCall) = responseCompleted.response.output.first else {
+            return XCTFail("Expected web search call")
+        }
+
+        let source = webSearchCall.action?.sources?.first
+        XCTAssertEqual(source?.type, "api")
+        XCTAssertEqual(source?.name, "oai-sports")
+        XCTAssertNil(source?.url)
     }
 
     func testOutputItemAddedForContentIsDecodable() throws {
